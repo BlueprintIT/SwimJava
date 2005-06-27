@@ -9,6 +9,14 @@ package com.blueprintit.swim;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Hashtable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.MalformedURLException;
 
@@ -16,6 +24,31 @@ import org.apache.log4j.Logger;
 
 public class Request
 {
+	private class ResourceOutputStream extends OutputStream
+	{
+		private OutputStream out;
+		private HttpURLConnection connection;
+
+		public ResourceOutputStream(HttpURLConnection connection) throws IOException
+		{
+			this.connection=connection;
+			connection.setDoOutput(true);
+			this.out=connection.getOutputStream();
+		}
+
+		public void write(int b) throws IOException
+		{
+			out.write(b);
+		}
+		
+		public void close() throws IOException
+		{
+			out.close();
+			connection.connect();
+			connection.getInputStream().close();
+		}
+	}
+	
 	private Logger log = Logger.getLogger(this.getClass());
 
 	private SwimInterface swim;
@@ -40,9 +73,15 @@ public class Request
 		this.resource=resource;
 	}
 	
+	public Request(SwimInterface swim, String resource)
+	{
+		this(swim,"view",resource);
+	}
+	
 	public Request(SwimInterface swim, String method, String resource, Map params)
 	{
 		this(swim,method,resource);
+		query.putAll(params);
 	}
 	
 	public Map getQuery()
@@ -146,5 +185,35 @@ public class Request
 			log.error("Could not build url from "+full);
 			return null;
 		}
+	}
+
+	public Reader openReader() throws IOException
+	{
+		return new InputStreamReader(openInputStream());
+	}
+	
+	public Writer openWriter() throws IOException
+	{
+		return new OutputStreamWriter(openOutputStream());
+	}
+	
+	public InputStream openInputStream() throws IOException
+	{
+		return openConnection("GET").getInputStream();
+	}
+	
+	public OutputStream openOutputStream() throws IOException
+	{
+		HttpURLConnection connection = openConnection("PUT");
+		return new ResourceOutputStream(connection);
+	}
+	
+	private HttpURLConnection openConnection(String method) throws IOException
+	{
+		URL url = encode();
+		log.info("Opening connection to "+url.toString());
+		HttpURLConnection connection = (HttpURLConnection)url.openConnection();
+		connection.setRequestMethod(method);
+		return connection;
 	}
 }
