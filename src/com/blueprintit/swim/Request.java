@@ -142,8 +142,9 @@ public class Request
 		}
 		catch (MalformedURLException e)
 		{
+			// TODO handle this error
 			log.error("Could not build url from "+full);
-			throw new IllegalArgumentException(e);
+			return null;
 		}
 	}
 }

@@ -60,6 +60,11 @@ public class SwimInterface
 		return url;
 	}
 	
+	public PageBrowser getPageBrowser()
+	{
+		return new PageBrowser(this);
+	}
+	
 	public String getResource(String path, String version) throws IOException
 	{
 		BufferedReader reader = new BufferedReader(openResourceReader(path,version));

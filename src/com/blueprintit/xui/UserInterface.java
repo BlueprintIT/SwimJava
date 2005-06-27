@@ -7,6 +7,8 @@
 package com.blueprintit.xui;
 
 import java.awt.Container;
+import java.awt.Dialog;
+import java.awt.Window;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Iterator;
@@ -18,12 +20,12 @@ import org.swixml.SwingEngine;
 
 public class UserInterface extends SwingEngine
 {
+	private Logger log = Logger.getLogger(this.getClass());
+
 	private Container container = null;
 	private String resource;
 	private List listeners = new LinkedList();
 	
-	private Logger log = Logger.getLogger(this.getClass());
-
 	public UserInterface(String resource) throws Exception
 	{
 		super();
@@ -75,6 +77,36 @@ public class UserInterface extends SwingEngine
 	public Container getContainer()
 	{
 		return container;
+	}
+	
+	public void show()
+	{
+		if (container instanceof Dialog)
+		{
+			((Dialog)container).setModal(false);
+		}
+		if (container instanceof Window)
+		{
+			((Window)container).show();
+		}
+		else
+		{
+			log.warn("Attempt to show something that isn't a window: "+container.getClass());
+		}
+	}
+	
+	public void showModal()
+	{
+		if (container instanceof Dialog)
+		{
+			Dialog dialog = (Dialog)container;
+			dialog.setModal(true);
+			dialog.show();
+		}
+		else
+		{
+			log.warn("Attempt to show modal something that isn't a dialog: "+container.getClass());
+		}
 	}
 	
 	private Reader getXUIReader()

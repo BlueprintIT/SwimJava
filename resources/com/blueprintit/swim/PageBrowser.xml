@@ -1,0 +1,19 @@
+<!--
+	$HeadURL$
+	$LastChangedBy$
+	$Date$
+	$Revision$
+-->
+
+<dialog resizable="true" layout="BorderLayout" size="500,300">
+	<splitpane constraints="BorderLayout.CENTER">
+		<scrollpane>
+			<list id="pageList"/>
+		</scrollpane>
+		<editorpane id="editorPane" editable="false" contentType="text/html"/>
+	</splitpane>
+	<panel constraints="BorderLayout.SOUTH">
+		<button text="OK"/>
+		<button text="Cancel"/>
+	</panel>
+</dialog>
