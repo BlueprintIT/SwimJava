@@ -22,6 +22,7 @@ public class SwimInterface
 	
 	public SwimInterface(URL url)
 	{
+		log.info("Created interface to "+url);
 		this.url=url;
 	}
 	

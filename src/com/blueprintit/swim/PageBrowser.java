@@ -1,8 +1,12 @@
 package com.blueprintit.swim;
 
+import java.awt.event.ActionEvent;
 import java.net.URL;
 
+import javax.swing.AbstractAction;
+import javax.swing.Action;
 import javax.swing.DefaultListModel;
+import javax.swing.JDialog;
 import javax.swing.JEditorPane;
 import javax.swing.JList;
 import javax.swing.event.ListSelectionEvent;
@@ -76,15 +80,31 @@ public class PageBrowser implements InterfaceListener
 	private Document list;
 	private HTMLEditorKit editorKit;
 	
+	public JDialog dialog;
 	public JList pageList;
 	public JEditorPane editorPane;
+
+	public Action okAction = new AbstractAction("OK") {
+		public void actionPerformed(ActionEvent e)
+		{
+			dialog.setVisible(false);
+		}
+	};
+	
+	public Action cancelAction = new AbstractAction("Cancel") {
+		public void actionPerformed(ActionEvent e)
+		{
+			pageList.setSelectedValue(null,false);
+			dialog.setVisible(false);
+		}
+	};
 
 	public PageBrowser(SwimInterface swim)
 	{
 		this.swim=swim;
 	}
 	
-	public String choosePage(String current) throws Exception
+	public String choosePage(String current)
 	{
 		try
 		{
@@ -103,7 +123,12 @@ public class PageBrowser implements InterfaceListener
 				}
 			}
 			ui.showModal();
-			return "";
+			Page page = (Page)pageList.getSelectedValue();
+			if (page!=null)
+			{
+				return page.getResource();
+			}
+			return null;
 		}
 		catch (Exception e)
 		{
@@ -112,7 +137,7 @@ public class PageBrowser implements InterfaceListener
 		}		
 	}
 	
-	public String choosePage() throws Exception
+	public String choosePage()
 	{
 		return choosePage(null);
 	}

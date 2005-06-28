@@ -5,7 +5,7 @@
 	$Revision$
 -->
 
-<dialog resizable="true" layout="BorderLayout" size="500,300">
+<dialog id="dialog" resizable="true" layout="BorderLayout" size="500,300">
 	<splitpane constraints="BorderLayout.CENTER">
 		<scrollpane>
 			<list id="pageList"/>
@@ -13,7 +13,7 @@
 		<editorpane id="editorPane" editable="false" contentType="text/html"/>
 	</splitpane>
 	<panel constraints="BorderLayout.SOUTH">
-		<button text="OK"/>
-		<button text="Cancel"/>
+		<button action="okAction"/>
+		<button action="cancelAction"/>
 	</panel>
 </dialog>
