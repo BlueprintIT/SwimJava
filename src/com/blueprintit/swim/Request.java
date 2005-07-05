@@ -181,7 +181,7 @@ public class Request
 		}
 		catch (MalformedURLException e)
 		{
-			// TODO handle this error
+			// TODO handle this error?
 			log.error("Could not build url from "+full);
 			return null;
 		}

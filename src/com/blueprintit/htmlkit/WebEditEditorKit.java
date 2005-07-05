@@ -12,11 +12,11 @@ import java.io.Writer;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
 import javax.swing.text.Element;
+import javax.swing.text.ParagraphView;
 import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLEditorKit;
-import javax.swing.text.html.ParagraphView;
 
 public class WebEditEditorKit extends HTMLEditorKit
 {

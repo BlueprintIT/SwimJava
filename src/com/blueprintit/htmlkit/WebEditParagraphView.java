@@ -27,7 +27,6 @@ public class WebEditParagraphView extends ParagraphView
 	public WebEditParagraphView(Element elem)
 	{
 		super(elem);
-
 		strategy = new AdvancedFlowStrategy();
 	}
 
@@ -313,7 +312,9 @@ public class WebEditParagraphView extends ParagraphView
 			{
 				e.printStackTrace();
 			}
-			int spaceCount = getSpaceCount(context) - 1;
+			int spaceCount = getSpaceCount(context);
+			if (context.charAt(context.length()-1)==' ')
+				spaceCount--;
 
 			int pixelsToAdd = targetSpan - span;
 
