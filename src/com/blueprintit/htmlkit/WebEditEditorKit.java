@@ -9,6 +9,7 @@ package com.blueprintit.htmlkit;
 import java.io.IOException;
 import java.io.Writer;
 
+import javax.swing.JEditorPane;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
 import javax.swing.text.Element;
@@ -18,8 +19,12 @@ import javax.swing.text.ViewFactory;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLEditorKit;
 
+import org.apache.log4j.Logger;
+
 public class WebEditEditorKit extends HTMLEditorKit
 {
+	private Logger log = Logger.getLogger(this.getClass());
+
 	private class WebEditFactory extends HTMLEditorKit.HTMLFactory
 	{
 		public View create(Element el)
@@ -31,6 +36,13 @@ public class WebEditEditorKit extends HTMLEditorKit
 			}
 			return view;
 		}
+	}
+	
+  private ViewFactory defaultFactory = new WebEditFactory();
+	
+	public WebEditEditorKit()
+	{
+		super();
 	}
 	
   public void write(Writer out, Document doc, int pos, int len) throws IOException, BadLocationException
@@ -46,15 +58,15 @@ public class WebEditEditorKit extends HTMLEditorKit
 		}
   }
 
-  private ViewFactory defaultFactory = new WebEditFactory();
-	
-	public WebEditEditorKit()
-	{
-		super();
-	}
-	
 	public ViewFactory getViewFactory()
 	{
 		return defaultFactory;
+	}
+	
+	public void install(JEditorPane pane)
+	{
+		log.info("Installing editor kit");
+		super.install(pane);
+		pane.setTransferHandler(new WebEditTransferHandler());
 	}
 }
