@@ -18,6 +18,7 @@ import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLEditorKit;
+import javax.swing.text.html.StyleSheet;
 
 import org.apache.log4j.Logger;
 
@@ -43,6 +44,20 @@ public class WebEditEditorKit extends HTMLEditorKit
 	public WebEditEditorKit()
 	{
 		super();
+	}
+	
+	public Document createDefaultDocument()
+	{
+		StyleSheet styles = getStyleSheet();
+		StyleSheet ss = new StyleSheet();
+
+		ss.addStyleSheet(styles);
+
+		HTMLDocument doc = new WebEditDocument(ss);
+		doc.setParser(getParser());
+		doc.setAsynchronousLoadPriority(4);
+		doc.setTokenThreshold(100);
+		return doc;
 	}
 	
   public void write(Writer out, Document doc, int pos, int len) throws IOException, BadLocationException
