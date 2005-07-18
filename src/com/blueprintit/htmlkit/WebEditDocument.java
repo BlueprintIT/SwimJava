@@ -1,10 +1,8 @@
 package com.blueprintit.htmlkit;
 
-import java.io.IOException;
-import java.io.StringReader;
 import java.util.Enumeration;
 import java.util.LinkedList;
-import java.util.StringTokenizer;
+import java.util.List;
 
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.UndoableEditEvent;
@@ -12,13 +10,11 @@ import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Element;
 import javax.swing.text.MutableAttributeSet;
+import javax.swing.text.Segment;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.html.HTML;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.StyleSheet;
-import javax.swing.text.html.HTML.Tag;
-import javax.swing.text.html.HTMLEditorKit.Parser;
-import javax.swing.text.html.HTMLEditorKit.ParserCallback;
 
 import org.apache.log4j.Logger;
 
@@ -91,83 +87,121 @@ public class WebEditDocument extends HTMLDocument
 		}
 	}
 
-	public void insertString(int offset, String text, AttributeSet attrs) throws BadLocationException
+	private void insertNewlineSpecs(List specs, List stack)
 	{
-		Element para = getRealParagraphElement(offset);
-		HTML.Tag tag = (Tag)para.getAttributes().getAttribute(StyleConstants.NameAttribute);
-		Element el = getCharacterElement(offset);
-		
-		int pop=0;
-		HTML.Tag eltag = (Tag)el.getAttributes().getAttribute(StyleConstants.NameAttribute);
-		while ((el!=para)&&(eltag!=HTML.Tag.BODY))
+		Element paragraph;
+		for (int j = 0; j<stack.size(); j++)
 		{
-			if (eltag!=HTML.Tag.CONTENT)
-				pop++; 
-			el=el.getParentElement();
-			eltag = (Tag)el.getAttributes().getAttribute(StyleConstants.NameAttribute);
+			log.info("End tag");
+			specs.add(new ElementSpec(null,ElementSpec.EndTagType));
 		}
-		if (el==para)
-			pop++;
-		
-		boolean first = true;
-		StringBuffer content = new StringBuffer();
-		StringTokenizer tokenizer = new StringTokenizer(text,"\n",true);
-		while (tokenizer.hasMoreTokens())
+		for (int j = stack.size(); --j>=0;)
 		{
-			String part = tokenizer.nextToken();
-			if (part.equals("\n"))
-			{
-				if (first)
-				{
-					first=false;
-				}
-				else
-				{
-					content.append("</"+tag.toString()+">\n");
-				}
-				content.append("<"+tag.toString()+">\n");
-			}
-			else
-			{
-				if (first)
-				{
-					super.insertString(offset,part,attrs);
-					offset+=part.length();
-				}
-				else
-				{
-					content.append(part);
-				}
-			}
-		}
-		if (!first)
-		{
-			if (offset==para.getStartOffset())
-			{
-				content.insert(0,"<"+tag.toString()+">\n</"+tag.toString()+">\n");
-			}
-			content.append(getText(offset,para.getEndOffset()-offset));
-			content.append("</"+tag.toString()+">");
-			log.info("Adding "+content);
-			log.info("Popping "+pop);
-			remove(offset,para.getEndOffset()-offset);
-			try
-			{
-				Parser p = getParser();
-
-				ParserCallback receiver = getReader(offset, pop, 0, tag);
-				Boolean ignoreCharset = (Boolean)getProperty("IgnoreCharsetDirective");
-				p.parse(new StringReader(content.toString()), receiver,
-						(ignoreCharset==null) ? false : ignoreCharset.booleanValue());
-				receiver.flush();
-			}
-			catch (IOException e)
-			{
-				e.printStackTrace();
-			}
+			log.info("Start tag");
+			paragraph = (Element)stack.get(j);
+			specs.add(new ElementSpec(paragraph.getAttributes(),ElementSpec.StartTagType));
 		}
 	}
 	
+  protected void insertUpdate(DefaultDocumentEvent chng, AttributeSet attr)
+	{
+		int offset = chng.getOffset();
+		int length = chng.getLength();
+  	log.info("Insert at "+offset+" length "+length);
+		List stack = new LinkedList();
+		boolean fracture=false;
+		Element paragraph = getParagraphElement(offset+length);
+  	log.info("Element at "+paragraph.getStartOffset()+" "+paragraph.getEndOffset());
+		if (offset>paragraph.getStartOffset())
+		{
+			fracture=true;
+		}
+		stack.add(paragraph);
+		HTML.Tag tag = (HTML.Tag)paragraph.getAttributes().getAttribute(StyleConstants.NameAttribute);
+		while (tag==HTML.Tag.IMPLIED)
+		{
+			paragraph=paragraph.getParentElement();
+			stack.add(paragraph);
+			tag = (HTML.Tag)paragraph.getAttributes().getAttribute(StyleConstants.NameAttribute);
+		}
+		List specs = new LinkedList();
+		
+		Segment s = new Segment();
+		s.setPartialReturn(false);
+		ElementSpec spec;
+		try
+		{
+			getText(offset,length,s);
+			int start = s.offset;
+			int end = s.count+s.offset;
+			int lastend = start;
+			
+			if (!fracture)
+			{
+				insertNewlineSpecs(specs,stack);
+			}
+			for (int i = start; i<end; i++)
+			{
+				if (s.array[i]=='\n')
+				{
+					if (lastend<i)
+					{
+						log.info("Adding content");
+						spec = new ElementSpec(attr,ElementSpec.ContentType,i-lastend);
+						if (lastend==start)
+						{
+							log.info("Joining with previous");
+							spec.setDirection(ElementSpec.JoinPreviousDirection);
+						}
+						specs.add(spec);
+					}
+					log.info("Adding newline content");
+					specs.add(new ElementSpec(attr,ElementSpec.ContentType,1));
+					insertNewlineSpecs(specs,stack);
+					lastend=i+1;
+				}
+			}
+			
+			if (specs.size()>0)
+			{
+				int pos=specs.size()-1;
+				spec = (ElementSpec)specs.get(pos);
+				while (spec.getType()==ElementSpec.StartTagType)
+				{
+					if (fracture)
+					{
+						log.info("Fracturing");
+						spec.setDirection(ElementSpec.JoinFractureDirection);
+					}
+					else
+					{
+						log.info("Joining");
+						spec.setDirection(ElementSpec.JoinNextDirection);
+					}
+					pos--;
+					spec = (ElementSpec)specs.get(pos);
+				}
+			}
+			
+			if ((lastend<end)&&(specs.size()>0))
+			{
+				log.info("Adding content");
+				spec = new ElementSpec(attr,ElementSpec.ContentType,end-lastend);
+				spec.setDirection(ElementSpec.JoinNextDirection);
+				specs.add(spec);
+			}
+			
+			if (specs.size()>0)
+			{
+				ElementSpec[] results = (ElementSpec[])specs.toArray(new ElementSpec[0]);
+				buffer.insert(offset,length,results,chng);
+			}
+		}
+		catch (BadLocationException e)
+		{
+		}
+	}
+  	
 	public java.util.Iterator getCharacterElementIterator(int start, int end)
 	{
 		if (end<start)
