@@ -236,7 +236,7 @@ public class WebEditDocument extends HTMLDocument
 		while (element.getEndOffset()<end)
 		{
 			int pos=element.getEndOffset();
-			element=getParagraphElement(pos);
+			element=getRealParagraphElement(pos);
 			elements.add(element);
 		}
 		return elements.iterator();
