@@ -1,6 +1,5 @@
 package com.blueprintit.htmlkit;
 
-import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -11,6 +10,7 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.Element;
 import javax.swing.text.MutableAttributeSet;
 import javax.swing.text.Segment;
+import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.html.HTML;
 import javax.swing.text.html.HTMLDocument;
@@ -51,39 +51,39 @@ public class WebEditDocument extends HTMLDocument
 		return el;
 	}
 	
-	public void replaceAttributes(Element e, AttributeSet a, HTML.Tag tag)
+	public void removeCharacterAttribute(int offset, int length, Object attribute)
 	{
-		if((e != null) && (a != null))
+		try
 		{
-			try
+			writeLock();
+			DefaultDocumentEvent changes = new DefaultDocumentEvent(offset, length, DocumentEvent.EventType.CHANGE);
+
+			// split elements that need it
+			buffer.change(offset, length, changes);
+
+			int lastEnd = Integer.MAX_VALUE;
+			for (int pos = offset; pos<(offset+length); pos = lastEnd)
 			{
-				writeLock();
-				int start = e.getStartOffset();
-				DefaultDocumentEvent changes = new DefaultDocumentEvent(start, e.getEndOffset() - start, DocumentEvent.EventType.CHANGE);
-				AttributeSet sCopy = a.copyAttributes();
-				changes.addEdit(new AttributeUndoableEdit(e, sCopy, false));
-				MutableAttributeSet attr = (MutableAttributeSet) e.getAttributes();
-				Enumeration aNames = attr.getAttributeNames();
-				Object value;
-				Object aName;
-				while (aNames.hasMoreElements())
+				Element run = getCharacterElement(pos);
+				lastEnd = run.getEndOffset();
+				if (pos==lastEnd)
 				{
-					aName = aNames.nextElement();
-					value = attr.getAttribute(aName);
-					if(value != null && !value.toString().equalsIgnoreCase(tag.toString()))
-					{
-						attr.removeAttribute(aName);
-					}
+					// offset + length beyond length of document, bail.
+					break;
 				}
-				attr.addAttributes(a);
-				changes.end();
-				fireChangedUpdate(changes);
-				fireUndoableEditUpdate(new UndoableEditEvent(this, changes));
+				MutableAttributeSet attr = (MutableAttributeSet) run.getAttributes();
+				MutableAttributeSet sCopy = new SimpleAttributeSet(attr);
+				sCopy.removeAttribute(attribute);
+				changes.addEdit(new AttributeUndoableEdit(run, sCopy, true));
+				attr.removeAttribute(attribute);
 			}
-			finally
-			{
-				writeUnlock();
-			}
+			changes.end();
+			fireChangedUpdate(changes);
+			fireUndoableEditUpdate(new UndoableEditEvent(this, changes));
+		}
+		finally
+		{
+			writeUnlock();
 		}
 	}
 
