@@ -10,7 +10,9 @@
 		<scrollpane>
 			<list id="pageList"/>
 		</scrollpane>
-		<editorpane id="editorPane" editable="false" contentType="text/html"/>
+		<scrollpane>
+			<editorpane id="editorPane" editable="false" contentType="text/html"/>
+		</scrollpane>
 	</splitpane>
 	<panel constraints="BorderLayout.SOUTH">
 		<button action="okAction"/>

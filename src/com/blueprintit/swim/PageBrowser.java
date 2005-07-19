@@ -19,6 +19,7 @@ import javax.swing.text.html.HTMLEditorKit;
 import org.apache.log4j.Logger;
 import org.jdom.Document;
 import org.jdom.Element;
+import org.jdom.filter.ElementFilter;
 import org.jdom.input.SAXBuilder;
 
 import com.blueprintit.errors.ErrorReporter;
@@ -150,7 +151,7 @@ public class PageBrowser implements InterfaceListener
 		editorKit = new WebEditEditorKit();
 		editorPane.setEditorKit(editorKit);
 		DefaultListModel model = new DefaultListModel();
-		Iterator it = list.getRootElement().getChildren("page").iterator();
+		Iterator it = list.getRootElement().getDescendants(new ElementFilter("page"));
 		while (it.hasNext())
 		{
 			Element el = (Element)it.next();
