@@ -2,6 +2,7 @@ package com.blueprintit.swim;
 
 import java.awt.event.ActionEvent;
 import java.net.URL;
+import java.util.Iterator;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -14,14 +15,13 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.text.StyledDocument;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLEditorKit;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.apache.log4j.Logger;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
+import org.jdom.Document;
+import org.jdom.Element;
+import org.jdom.input.SAXBuilder;
 
+import com.blueprintit.errors.ErrorReporter;
 import com.blueprintit.htmlkit.WebEditEditorKit;
 import com.blueprintit.xui.InterfaceEvent;
 import com.blueprintit.xui.InterfaceListener;
@@ -38,9 +38,9 @@ public class PageBrowser implements InterfaceListener
 		
 		public Page(Element element)
 		{
-			id=element.getAttribute("id");
-			container=((Element)element.getParentNode()).getAttribute("id");
-			title=element.getAttribute("title");
+			id=element.getAttributeValue("id");
+			container=element.getParentElement().getAttributeValue("id");
+			title=element.getAttributeValue("title");
 		}
 		
 		public String toString()
@@ -109,8 +109,8 @@ public class PageBrowser implements InterfaceListener
 		try
 		{
 			Request request = swim.getRequest("list","");
-			DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-			list=builder.parse(request.encode().toString());
+			SAXBuilder builder = new SAXBuilder();
+			list=builder.build(request.encode());
 
 			UserInterface ui = new UserInterface(this);
 			for (int i=pageList.getModel().getSize()-1; i>=0; i--)
@@ -133,6 +133,9 @@ public class PageBrowser implements InterfaceListener
 		catch (Exception e)
 		{
 			log.error("Unable to load site list",e);
+			ErrorReporter.sendErrorReport(
+					"Error loading site details","The pages could not be retrieved. The server could be down or misconfigured.",
+					"Swim","WebEdit","Could not load site list",e);
 			return null;
 		}		
 	}
@@ -147,10 +150,10 @@ public class PageBrowser implements InterfaceListener
 		editorKit = new WebEditEditorKit();
 		editorPane.setEditorKit(editorKit);
 		DefaultListModel model = new DefaultListModel();
-		NodeList items = list.getElementsByTagName("page");
-		for (int i=0; i<items.getLength(); i++)
+		Iterator it = list.getRootElement().getChildren("page").iterator();
+		while (it.hasNext())
 		{
-			Element el = (Element)items.item(i);
+			Element el = (Element)it.next();
 			model.addElement(new Page(el));
 		}
 		pageList.setModel(model);

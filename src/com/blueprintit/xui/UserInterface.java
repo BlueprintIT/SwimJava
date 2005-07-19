@@ -79,6 +79,14 @@ public class UserInterface extends SwingEngine
 		return container;
 	}
 	
+	public void hide()
+	{
+		if (container instanceof Window)
+		{
+			((Window)container).setVisible(false);
+		}
+	}
+	
 	public void show()
 	{
 		if (container instanceof Dialog)

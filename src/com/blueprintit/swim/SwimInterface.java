@@ -13,6 +13,9 @@ import java.net.URL;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
+import org.jdom.Document;
+import org.jdom.Element;
+import org.jdom.input.SAXBuilder;
 
 public class SwimInterface
 {
@@ -41,6 +44,35 @@ public class SwimInterface
 		return new Request(this,method,resource,params);
 	}
 	
+	public RemoteEntry getEntry(String path, String version)
+	{
+		Element list = loadList(path,version);
+		if (list.getName().equals("dir"))
+		{
+			return new RemoteDir(this,path,version,list);
+		}
+		else
+		{
+			return new RemoteFile(this,path,version,list);
+		}
+	}
+	
+	Element loadList(String path, String version)
+	{
+		try
+		{
+			Request request = getRequest("list",path);
+			request.getQuery().put("version",version);
+			SAXBuilder builder = new SAXBuilder();
+			Document document = builder.build(request.encode());
+			return document.getRootElement();
+		}
+		catch (Exception e)
+		{
+			return null;
+		}
+	}
+
 	public URL getURL()
 	{
 		return url;
