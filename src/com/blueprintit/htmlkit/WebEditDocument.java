@@ -107,11 +107,9 @@ public class WebEditDocument extends HTMLDocument
 	{
 		int offset = chng.getOffset();
 		int length = chng.getLength();
-  	log.info("Insert at "+offset+" length "+length);
 		List stack = new LinkedList();
 		boolean fracture=false;
 		Element paragraph = getParagraphElement(offset+length);
-  	log.info("Element at "+paragraph.getStartOffset()+" "+paragraph.getEndOffset());
 		if (offset>paragraph.getStartOffset())
 		{
 			fracture=true;

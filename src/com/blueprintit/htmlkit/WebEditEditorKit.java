@@ -23,6 +23,7 @@ import javax.swing.text.ViewFactory;
 import javax.swing.text.html.HTML;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLEditorKit;
+import javax.swing.text.html.ImageView;
 import javax.swing.text.html.StyleSheet;
 
 import org.apache.log4j.Logger;
@@ -39,6 +40,10 @@ public class WebEditEditorKit extends HTMLEditorKit
 			if (view instanceof ParagraphView)
 			{
 				return new WebEditParagraphView(el);
+			}
+			else if (view instanceof ImageView)
+			{
+				return new AnchorView(el);
 			}
 			return view;
 		}

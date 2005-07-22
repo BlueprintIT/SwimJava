@@ -2,9 +2,9 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/jdom-1.0"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/log4j-1.2"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/swixml-144"/>
 	<classpathentry kind="src" path="resources"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/log4j-1.2"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
