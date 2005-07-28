@@ -44,7 +44,10 @@ public class WebEditParagraphView extends ParagraphView
 		{
 			WebEditParagraphView wv = (WebEditParagraphView) fv;
 
-			log.info("layout");
+			AttributeSet attr = wv.getAttributes();
+			float lineSpacing = StyleConstants.getLineSpacing(attr);
+
+			//log.info("layout");
 			wv.clearImages();
 
 			int pos = fv.getStartOffset();
@@ -62,7 +65,7 @@ public class WebEditParagraphView extends ParagraphView
 			fv.removeAll();
 			for (int rowIndex = 0; pos<end; rowIndex++)
 			{
-				View row = wv.createRow();
+				AdvancedRow row = (AdvancedRow)wv.createRow();
 				wv.append(row);
 
 				// layout the row to the current span. If nothing fits,
@@ -81,38 +84,17 @@ public class WebEditParagraphView extends ParagraphView
 				{
 					pos = next;
 				}
+				if (pos>=end)
+				{
+					row.setLastRow(true);
+				}
 			}
 			wv.layoutImages(wv.getViewCount()-1);
-			/*AttributeSet attr = wv.getAttributes();
-			float lineSpacing = StyleConstants.getLineSpacing(attr);
 			boolean justifiedAlignment = (StyleConstants.getAlignment(attr)==StyleConstants.ALIGN_JUSTIFIED);
 			if (!(justifiedAlignment||(lineSpacing>1)))
 			{
 				return;
 			}
-
-			int cnt = wv.getViewCount();
-			for (int i = 0; i<cnt-1; i++)
-			{
-				AdvancedRow row = (AdvancedRow) wv.getView(i);
-
-				if (lineSpacing>1)
-				{
-					float height = row.getMinimumSpan(View.Y_AXIS);
-					float addition = (height*lineSpacing)-height;
-					if (addition>0)
-					{
-						row.setInsets(row.getTopInset(), row.getLeftInset(),
-								(short) addition, row.getRightInset());
-					}
-				}
-
-				if (justifiedAlignment)
-				{
-					restructureRow(row, i);
-					row.setRowNumber(i+1);
-				}
-			}*/
 		}
 
 		protected int layoutRow(WebEditParagraphView fv, int rowIndex, int pos)
@@ -120,7 +102,7 @@ public class WebEditParagraphView extends ParagraphView
 			if (rowIndex>0)
 				fv.layoutImages(rowIndex-1);
 
-			log.info("Layout row "+rowIndex);
+			//log.info("Layout row "+rowIndex);
 			final int flowAxis = fv.getFlowAxis();
 			View row = fv.getView(rowIndex);
 
@@ -249,11 +231,18 @@ public class WebEditParagraphView extends ParagraphView
 
 	class AdvancedRow extends BoxView
 	{
+		boolean lastRow = false;
+		
 		AdvancedRow(Element elem)
 		{
 			super(elem, View.X_AXIS);
 		}
 
+		void setLastRow(boolean value)
+		{
+			lastRow=value;
+		}
+		
 		protected void loadChildren(ViewFactory f)
 		{
 		}
@@ -378,7 +367,7 @@ public class WebEditParagraphView extends ParagraphView
 		{
 			super.layoutMajorAxis(targetSpan, axis, offsets, spans);
 			AttributeSet attr = getAttributes();
-			if ((StyleConstants.getAlignment(attr) != StyleConstants.ALIGN_JUSTIFIED)
+			if ((lastRow) || (StyleConstants.getAlignment(attr) != StyleConstants.ALIGN_JUSTIFIED)
 					|| (axis != View.X_AXIS))
 			{
 				return;
@@ -408,7 +397,7 @@ public class WebEditParagraphView extends ParagraphView
 				if (v instanceof GlyphView)
 				{
 					int endchar = (v.getEndOffset()-startOffset)-1;
-					if (context.charAt(endchar)==' ')
+					if (Character.isWhitespace(context.charAt(endchar)))
 					{
 						spaces++;
 						hasSpace[i]=true;
@@ -431,9 +420,11 @@ public class WebEditParagraphView extends ParagraphView
 			double pixelsToAdd = 0;
 			for (int i=0; i<count; i++)
 			{
-				offsets[i]+=pixelsToAdd;
+				offsets[i]+=Math.round(pixelsToAdd);
 				if (hasSpace[i])
 				{
+					// Pad out span too so selection looks right.
+					spans[i]+=Math.ceil(gap);
 					pixelsToAdd+=gap;
 				}
 			}
@@ -557,32 +548,14 @@ public class WebEditParagraphView extends ParagraphView
 			return span;
 		}
 		
-		public int getIntrinsicWidth()
+		public int getWidth()
 		{
 			return (int)view.getPreferredSpan(View.X_AXIS);
 		}
 		
-		public int getIntrinsicHeight()
-		{
-			return (int)view.getPreferredSpan(View.Y_AXIS);
-		}
-		
-		public int getWidth()
-		{
-			if (view.getAttributes().isDefined(CSS.Attribute.WIDTH))
-			{
-				return Integer.parseInt((String)view.getAttributes().getAttribute(CSS.Attribute.WIDTH));
-			}
-			return getIntrinsicWidth();
-		}
-		
 		public int getHeight()
 		{
-			if (view.getAttributes().isDefined(CSS.Attribute.HEIGHT))
-			{
-				return Integer.parseInt((String)view.getAttributes().getAttribute(CSS.Attribute.HEIGHT));
-			}
-			return getIntrinsicHeight();
+			return (int)view.getPreferredSpan(View.Y_AXIS);
 		}
 	}
 	

@@ -1,5 +1,6 @@
 package com.blueprintit.htmlkit;
 
+import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Rectangle;
 import java.awt.Shape;
@@ -9,14 +10,21 @@ import javax.swing.ImageIcon;
 import javax.swing.event.DocumentEvent;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.Highlighter;
+import javax.swing.text.JTextComponent;
+import javax.swing.text.LayeredHighlighter;
 import javax.swing.text.Position;
 import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
 import javax.swing.text.html.CSS;
 import javax.swing.text.html.ImageView;
 
+import org.apache.log4j.Logger;
+
 public class AnchorView extends View
 {
+	private Logger log = Logger.getLogger(this.getClass());
+
 	private ImageView image;
   private static Icon anchorIcon;
 
@@ -88,12 +96,25 @@ public class AnchorView extends View
   
 	public void paint(Graphics g, Shape a)
 	{
+		log.info("Paint called");
 		if (isDisplayingImage())
 		{
-			image.paint(g,a);
+			image.paint(g, a);
 		}
 		else if (isDisplayingAnchor())
 		{
+			int start = getStartOffset();
+			int end = getEndOffset();
+			Component c = getContainer();
+			if (c instanceof JTextComponent)
+			{
+				JTextComponent tc = (JTextComponent) c;
+				Highlighter h = tc.getHighlighter();
+				if (h instanceof LayeredHighlighter)
+				{
+					((LayeredHighlighter) h).paintLayeredHighlights(g, start, end, a, tc, this);
+				}
+			}
 			Rectangle rect = (a instanceof Rectangle) ? (Rectangle) a : a.getBounds();
 			anchorIcon.paintIcon(getContainer(), g, rect.x, rect.y);
 		}
@@ -131,7 +152,7 @@ public class AnchorView extends View
   	}
   	else
   	{
-  		return 0.5f;
+  		return 1f;
   	}
   }
   
