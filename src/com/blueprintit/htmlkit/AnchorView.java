@@ -6,13 +6,18 @@ import java.awt.Shape;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
+import javax.swing.event.DocumentEvent;
+import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
-import javax.swing.text.Element;
 import javax.swing.text.Position;
 import javax.swing.text.View;
+import javax.swing.text.ViewFactory;
+import javax.swing.text.html.CSS;
+import javax.swing.text.html.ImageView;
 
 public class AnchorView extends View
 {
+	private ImageView image;
   private static Icon anchorIcon;
 
   /**
@@ -21,105 +26,167 @@ public class AnchorView extends View
 	 * @param elem
 	 *          the element to create a view for
 	 */
-	public AnchorView(Element elem)
+	public AnchorView(ImageView image)
 	{
-		super(elem);
+		super(image.getElement());
+		this.image=image;
 		if (anchorIcon==null)
 			anchorIcon = new ImageIcon(this.getClass().getClassLoader().getResource("com/blueprintit/htmlkit/icons/anchor.gif"));
 	}
 
-  /**
-	 * Paints the View.
-	 * 
-	 * @param g
-	 *          the rendering surface to use
-	 * @param a
-	 *          the allocated region to render into
-	 * @see View#paint
-	 */
+	public boolean isDisplayingImage()
+	{
+		AttributeSet attrs = image.getAttributes();
+		return !attrs.isDefined(CSS.Attribute.FLOAT);
+	}
+	
+	public boolean isDisplayingAnchor()
+	{
+		return !isDisplayingImage();
+	}
+	
+	public ImageView getImageView()
+	{
+		return image;
+	}
+	
+  public AttributeSet getAttributes()
+  {
+  	if (isDisplayingImage())
+  	{
+  		return image.getAttributes();
+  	}
+  	else
+  	{
+  		return super.getAttributes();
+  	}
+  }
+
+  public String getToolTipText(float x, float y, Shape allocation)
+  {
+  	if (isDisplayingImage())
+  	{
+  		return image.getToolTipText(x,y,allocation);
+  	}
+  	else
+  	{
+  		return "Image Anchor";
+  	}
+  }
+  
+  public void setParent(View parent)
+  {
+  	image.setParent(parent);
+  	super.setParent(parent);
+  }
+  
+  public void changedUpdate(DocumentEvent e, Shape a, ViewFactory f)
+  {
+  	super.changedUpdate(e,a,f);
+  	image.changedUpdate(e,a,f);
+  }
+  
 	public void paint(Graphics g, Shape a)
 	{
-		Rectangle rect = (a instanceof Rectangle) ? (Rectangle) a : a.getBounds();
-		anchorIcon.paintIcon(getContainer(), g, rect.x, rect.y);
+		if (isDisplayingImage())
+		{
+			image.paint(g,a);
+		}
+		else if (isDisplayingAnchor())
+		{
+			Rectangle rect = (a instanceof Rectangle) ? (Rectangle) a : a.getBounds();
+			anchorIcon.paintIcon(getContainer(), g, rect.x, rect.y);
+		}
 	}
 
-  /**
-	 * Determines the preferred span for this view along an axis.
-	 * 
-	 * @param axis
-	 *          may be either X_AXIS or Y_AXIS
-	 * @return the span the view would like to be rendered into; typically the
-	 *         view is told to render into the span that is returned, although
-	 *         there is no guarantee; the parent may choose to resize or break the
-	 *         view
-	 */
 	public float getPreferredSpan(int axis)
 	{
-		switch (axis)
+		if (isDisplayingImage())
 		{
-			case View.X_AXIS:
-				return anchorIcon.getIconWidth();
-			case View.Y_AXIS:
-				return anchorIcon.getIconHeight();
-			default:
-				throw new IllegalArgumentException("Invalid axis: "+axis);
+			return image.getPreferredSpan(axis);
+		}
+		else if (isDisplayingAnchor())
+		{
+			switch (axis)
+			{
+				case View.X_AXIS:
+					return anchorIcon.getIconWidth();
+				case View.Y_AXIS:
+					return anchorIcon.getIconHeight();
+				default:
+					throw new IllegalArgumentException("Invalid axis: "+axis);
+			}
+		}
+		else
+		{
+			return 0;
 		}
 	}
 
-  /**
-	 * Provides a mapping from the document model coordinate space to the
-	 * coordinate space of the view mapped to it.
-	 * 
-	 * @param pos
-	 *          the position to convert
-	 * @param a
-	 *          the allocated region to render into
-	 * @return the bounding box of the given position
-	 * @exception BadLocationException
-	 *              if the given position does not represent a valid location in
-	 *              the associated document
-	 * @see View#modelToView
-	 */
+  public float getAlignment(int axis)
+  {
+  	if (isDisplayingImage())
+  	{
+  		return image.getAlignment(axis);
+  	}
+  	else
+  	{
+  		return 0.5f;
+  	}
+  }
+  
 	public Shape modelToView(int pos, Shape a, Position.Bias b) throws BadLocationException
 	{
-		int p0 = getStartOffset();
-		int p1 = getEndOffset();
-		if ((pos>=p0)&&(pos<=p1))
+		if (isDisplayingImage())
 		{
-			Rectangle r = a.getBounds();
-			if (pos==p1)
-			{
-				r.x += r.width;
-			}
-			r.width = 0;
-			return r;
+			return image.modelToView(pos,a,b);
 		}
-		return null;
+		else
+		{
+			int p0 = getStartOffset();
+			int p1 = getEndOffset();
+			if ((pos>=p0)&&(pos<=p1))
+			{
+				Rectangle r = a.getBounds();
+				if (pos==p1)
+				{
+					r.x += r.width;
+				}
+				r.width = 0;
+				return r;
+			}
+			return null;
+		}
 	}
 
-  /**
-	 * Provides a mapping from the view coordinate space to the logical coordinate
-	 * space of the model.
-	 * 
-	 * @param x
-	 *          the X coordinate
-	 * @param y
-	 *          the Y coordinate
-	 * @param a
-	 *          the allocated region to render into
-	 * @return the location within the model that best represents the given point
-	 *         of view
-	 * @see View#viewToModel
-	 */
 	public int viewToModel(float x, float y, Shape a, Position.Bias[] bias)
 	{
-		Rectangle alloc = (Rectangle) a;
-		if (x<alloc.x+alloc.width)
+		if (isDisplayingImage())
 		{
-			bias[0] = Position.Bias.Forward;
-			return getStartOffset();
+			return image.viewToModel(x,y,a,bias);
 		}
-		bias[0] = Position.Bias.Backward;
-		return getEndOffset();
+		else
+		{
+			Rectangle alloc = (Rectangle) a;
+			if (x<alloc.x+alloc.width)
+			{
+				bias[0] = Position.Bias.Forward;
+				return getStartOffset();
+			}
+			bias[0] = Position.Bias.Backward;
+			return getEndOffset();
+		}
+	}
+
+	public void setSize(float width, float height)
+	{
+		if (isDisplayingImage())
+		{
+			image.setSize(width,height);
+		}
+		else
+		{
+			super.setSize(width,height);
+		}
 	}
 }

@@ -43,7 +43,7 @@ public class WebEditEditorKit extends HTMLEditorKit
 			}
 			else if (view instanceof ImageView)
 			{
-				return new AnchorView(el);
+				return new AnchorView((ImageView)view);
 			}
 			return view;
 		}

@@ -6,7 +6,6 @@
  */
 package com.blueprintit.htmlkit;
 
-import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Rectangle;
 import java.awt.Shape;
@@ -15,15 +14,17 @@ import java.util.Iterator;
 import java.util.List;
 
 import javax.swing.SizeRequirements;
-import javax.swing.event.DocumentEvent;
+import javax.swing.text.Document;
+import javax.swing.text.GlyphView;
 import javax.swing.text.Position;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.BoxView;
 import javax.swing.text.Element;
 import javax.swing.text.FlowView;
+import javax.swing.text.TabExpander;
+import javax.swing.text.TabableView;
 import javax.swing.text.html.CSS;
-import javax.swing.text.html.HTML;
 import javax.swing.text.html.ParagraphView;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.View;
@@ -41,106 +42,213 @@ public class WebEditParagraphView extends ParagraphView
 
 		public void layout(FlowView fv)
 		{
+			WebEditParagraphView wv = (WebEditParagraphView) fv;
+
 			log.info("layout");
-			((WebEditParagraphView)fv).invalidateImages();
-			super.layout(fv);
-			((WebEditParagraphView)fv).layoutImages(fv.getViewCount()-1);
-			AttributeSet attr = fv.getAttributes();
+			wv.clearImages();
+
+			int pos = fv.getStartOffset();
+			int end = fv.getEndOffset();
+
+			// we want to preserve all views from the logicalView from being
+			// removed
+			View lv = getLogicalView(fv);
+			int n = lv.getViewCount();
+			for (int i = 0; i<n; i++)
+			{
+				View v = lv.getView(i);
+				v.setParent(lv);
+			}
+			fv.removeAll();
+			for (int rowIndex = 0; pos<end; rowIndex++)
+			{
+				View row = wv.createRow();
+				wv.append(row);
+
+				// layout the row to the current span. If nothing fits,
+				// force something.
+				int next = layoutRow(wv, rowIndex, pos);
+				if (row.getViewCount()==0)
+				{
+					row.append(createView(wv, pos, Integer.MAX_VALUE, rowIndex));
+					next = row.getEndOffset();
+				}
+				if (next<=pos)
+				{
+					throw new RuntimeException("infinite loop in formatting");
+				}
+				else
+				{
+					pos = next;
+				}
+			}
+			wv.layoutImages(wv.getViewCount()-1);
+			/*AttributeSet attr = wv.getAttributes();
 			float lineSpacing = StyleConstants.getLineSpacing(attr);
-			boolean justifiedAlignment = (StyleConstants.getAlignment(attr) == StyleConstants.ALIGN_JUSTIFIED);
-			if (!(justifiedAlignment || (lineSpacing > 1)))
+			boolean justifiedAlignment = (StyleConstants.getAlignment(attr)==StyleConstants.ALIGN_JUSTIFIED);
+			if (!(justifiedAlignment||(lineSpacing>1)))
 			{
 				return;
 			}
 
-			int cnt = fv.getViewCount();
-			for (int i = 0; i < cnt - 1; i++)
+			int cnt = wv.getViewCount();
+			for (int i = 0; i<cnt-1; i++)
 			{
-				AdvancedRow row = (AdvancedRow) fv.getView(i);
-				/*if (lineSpacing > 1)
+				AdvancedRow row = (AdvancedRow) wv.getView(i);
+
+				if (lineSpacing>1)
 				{
 					float height = row.getMinimumSpan(View.Y_AXIS);
-					float addition = (height * lineSpacing) - height;
-					if (addition > 0)
+					float addition = (height*lineSpacing)-height;
+					if (addition>0)
 					{
 						row.setInsets(row.getTopInset(), row.getLeftInset(),
 								(short) addition, row.getRightInset());
 					}
-				}*/
+				}
 
 				if (justifiedAlignment)
 				{
 					restructureRow(row, i);
-					row.setRowNumber(i + 1);
+					row.setRowNumber(i+1);
 				}
-			}
+			}*/
 		}
 
-		protected int layoutRow(FlowView fv, int rowIndex, int pos)
+		protected int layoutRow(WebEditParagraphView fv, int rowIndex, int pos)
 		{
 			if (rowIndex>0)
-				((WebEditParagraphView)fv).layoutImages(rowIndex-1);
-			return super.layoutRow(fv, rowIndex, pos);
-		}
-		
-		protected void restructureRow(View row, int rowNum)
-		{
-			int rowStartOffset = row.getStartOffset();
-			int rowEndOffset = row.getEndOffset();
-			String rowContent = "";
-			try
+				fv.layoutImages(rowIndex-1);
+
+			log.info("Layout row "+rowIndex);
+			final int flowAxis = fv.getFlowAxis();
+			View row = fv.getView(rowIndex);
+
+			int imageRow=rowIndex;
+
+			int span = 0;
+			int indent = fv.getFlowStart(rowIndex);
+			int totalSpan = fv.getFlowSpan(rowIndex);
+			int remaining = totalSpan;
+			int end = fv.getEndOffset();
+			
+			boolean justified = (StyleConstants.getAlignment(fv.getAttributes())==StyleConstants.ALIGN_JUSTIFIED);
+			
+			TabExpander te = (fv instanceof TabExpander) ? (TabExpander) fv : null;
+
+			boolean forcedBreak = false;
+			while (pos<end&&remaining>0)
 			{
-				rowContent = row.getDocument().getText(rowStartOffset,
-						rowEndOffset - rowStartOffset);
-				if (rowNum == 0)
+				View v = createView(fv, pos, remaining, rowIndex);
+				if (v==null)
 				{
-					while (rowContent.charAt(0) == ' ')
+					break;
+				}
+				
+				int chunkSpan;
+				
+				if ((v instanceof AnchorView)&&(((AnchorView)v).isDisplayingAnchor()))
+				{
+					fv.addImageAnchor((AnchorView)v, imageRow);
+					pos=v.getEndOffset();
+					chunkSpan = (int)v.getPreferredSpan(flowAxis);
+					if (imageRow==rowIndex)
 					{
-						rowContent = rowContent.substring(1);
-						if (rowContent.length() == 0)
-							break;
+						indent = fv.getFlowStart(imageRow);
+						totalSpan = fv.getFlowSpan(rowIndex);
 					}
 				}
-			}
-			catch (Exception e)
-			{
-				e.printStackTrace();
-			}
-			int rowSpaceCount = getSpaceCount(rowContent);
-			if (rowSpaceCount < 1)
-				return;
-			int[] rowSpaceIndexes = getSpaceIndexes(rowContent, row.getStartOffset());
-			int currentSpaceIndex = 0;
-
-			for (int i = 0; i < row.getViewCount(); i++)
-			{
-				View child = row.getView(i);
-				if ((child.getStartOffset() < rowSpaceIndexes[currentSpaceIndex])
-						&& (child.getEndOffset() > rowSpaceIndexes[currentSpaceIndex]))
+				else
 				{
-					//split view
-					View first = child.createFragment(child.getStartOffset(),
-							rowSpaceIndexes[currentSpaceIndex]);
-					View second = child.createFragment(
-							rowSpaceIndexes[currentSpaceIndex], child.getEndOffset());
-					View[] repl = new View[2];
-					repl[0] = first;
-					repl[1] = second;
+					imageRow=rowIndex+1;
 
-					row.replace(i, 1, repl);
-					currentSpaceIndex++;
-					if (currentSpaceIndex >= rowSpaceIndexes.length)
-						break;
+					if (justified)
+					{
+						Document doc = fv.getDocument();
+						try
+						{
+							int st = v.getStartOffset();
+							String content = doc.getText(st,v.getEndOffset()-st);
+							int spc = content.indexOf(" ");
+							if (spc>=0)
+							{
+								//log.info("Splitting view at character "+(v.getStartOffset()+spc+1));
+								v=v.createFragment(v.getStartOffset(),v.getStartOffset()+spc+1);
+							}
+						}
+						catch (BadLocationException e)
+						{
+							log.error("This should never happen",e);
+						}
+					}
+					
+					if ((flowAxis==X_AXIS)&&(v instanceof TabableView))
+					{
+						chunkSpan = (int) ((TabableView) v).getTabbedSpan(indent+span, te);
+					}
+					else
+					{
+						chunkSpan = (int) v.getPreferredSpan(flowAxis);
+					}
+
+					if (v.getBreakWeight(flowAxis, indent+span, remaining)>=ForcedBreakWeight)
+					{
+						int n = row.getViewCount();
+						if (n>0)
+						{
+							v = v.breakView(flowAxis, pos, indent+span, remaining);
+							if (v!=null)
+							{
+								if ((flowAxis==X_AXIS)&&(v instanceof TabableView))
+								{
+									chunkSpan = (int) ((TabableView) v).getTabbedSpan(indent+span, te);
+								}
+								else
+								{
+									chunkSpan = (int) v.getPreferredSpan(flowAxis);
+								}
+							}
+							else
+							{
+								chunkSpan = 0;
+							}
+						}
+						forcedBreak = true;
+					}	
 				}
-			}
-		}
 
+				span += chunkSpan;
+				remaining = totalSpan-span;
+				if (v!=null)
+				{
+					//log.info("Adding view "+v.getStartOffset()+" - "+v.getEndOffset());
+					row.append(v);
+					pos = v.getEndOffset();
+				}
+				if (forcedBreak)
+				{
+					break;
+				}
+
+			}
+			if (remaining<0)
+			{
+				// This row is too long and needs to be adjusted.
+				adjustRow(fv, rowIndex, totalSpan, indent);
+			}
+			else if (row.getViewCount()==0)
+			{
+				// Impossible spec... put in whatever is left.
+				View v = createView(fv, pos, Integer.MAX_VALUE, rowIndex);
+				row.append(v);
+			}
+			//log.info("Row "+rowIndex+" became "+row.getViewCount()+" views");
+			return row.getEndOffset();
+		}
 	}
 
 	class AdvancedRow extends BoxView
 	{
-		private int rowNumber = 0;
-
 		AdvancedRow(Element elem)
 		{
 			super(elem, View.X_AXIS);
@@ -271,19 +379,12 @@ public class WebEditParagraphView extends ParagraphView
 			super.layoutMajorAxis(targetSpan, axis, offsets, spans);
 			AttributeSet attr = getAttributes();
 			if ((StyleConstants.getAlignment(attr) != StyleConstants.ALIGN_JUSTIFIED)
-					&& (axis != View.X_AXIS))
+					|| (axis != View.X_AXIS))
 			{
 				return;
 			}
-			int cnt = offsets.length;
+			int count = offsets.length;
 
-			int span = 0;
-			for (int i = 0; i < cnt; i++)
-			{
-				span += spans[i];
-			}
-			if (getRowNumber() == 0)
-				return;
 			int startOffset = getStartOffset();
 			int len = getEndOffset() - startOffset;
 			String context = "";
@@ -295,55 +396,47 @@ public class WebEditParagraphView extends ParagraphView
 			{
 				e.printStackTrace();
 			}
-			int spaceCount = getSpaceCount(context);
-			if (context.charAt(context.length()-1)==' ')
-				spaceCount--;
-
-			int pixelsToAdd = targetSpan - span;
-
-			if (this.getRowNumber() == 1)
+			
+			boolean[] hasSpace = new boolean[count];
+			
+			int span = 0;
+			int spaces = 0;
+			for (int i = 0;  i<count; i++)
 			{
-				int firstLineIndent = (int) StyleConstants
-						.getFirstLineIndent(getAttributes());
-				pixelsToAdd -= firstLineIndent;
-			}
-
-			int[] spaces = getSpaces(pixelsToAdd, spaceCount);
-			int j = 0;
-			int shift = 0;
-			for (int i = 1; i < cnt; i++)
-			{
+				span += spans[i];
 				View v = getView(i);
-				offsets[i] += shift;
-				if ((isContainSpace(v)) && (i != cnt - 1))
+				if (v instanceof GlyphView)
 				{
-					offsets[i] += spaces[j];
-					spans[i - 1] += spaces[j];
-					shift += spaces[j];
-					j++;
+					int endchar = (v.getEndOffset()-startOffset)-1;
+					if (context.charAt(endchar)==' ')
+					{
+						spaces++;
+						hasSpace[i]=true;
+						continue;
+					}
 				}
+				hasSpace[i]=false;
 			}
-		}
-
-		protected int[] getSpaces(int space, int cnt)
-		{
-			int[] result = new int[cnt];
-			if (cnt == 0)
-				return result;
-			int base = space / cnt;
-			int rst = space % cnt;
-
-			for (int i = 0; i < cnt; i++)
+			if (context.charAt(context.length()-1)==' ')
 			{
-				result[i] = base;
-				if (rst > 0)
+				spaces--;
+			}
+			
+			if (spaces==0)
+			{
+				return;
+			}
+		
+			double gap = (targetSpan - span)/(1.0*spaces);
+			double pixelsToAdd = 0;
+			for (int i=0; i<count; i++)
+			{
+				offsets[i]+=pixelsToAdd;
+				if (hasSpace[i])
 				{
-					result[i]++;
-					rst--;
+					pixelsToAdd+=gap;
 				}
 			}
-
-			return result;
 		}
 
 		/*public float getMinimumSpan(int axis)
@@ -405,29 +498,19 @@ public class WebEditParagraphView extends ParagraphView
 				return super.getPreferredSpan(axis);
 			}
 		}
-
-		public void setRowNumber(int value)
-		{
-			rowNumber = value;
-		}
-
-		public int getRowNumber()
-		{
-			return rowNumber;
-		}
 	}
 
 	class FloatedElement
 	{
-		protected Element element;
+		protected View view;
 		private int side;
 		private int start = -1;
 		private int span = -1;
 		
-		private FloatedElement(Element el)
+		private FloatedElement(View v)
 		{
-			this.element=el;
-			String value = (String)el.getAttributes().getAttribute(CSS.Attribute.FLOAT);
+			this.view=v;
+			String value = (String)view.getAttributes().getAttribute(CSS.Attribute.FLOAT);
 			value=value.toLowerCase();
 			if (value.equals("left"))
 			{
@@ -441,13 +524,12 @@ public class WebEditParagraphView extends ParagraphView
 		
 		public void paint(Graphics g, Rectangle a)
 		{
-			g.setColor(Color.BLACK);
-			g.fillRect(a.x,a.y,a.width,a.height);
+			view.paint(g,a);
 		}
 		
 		public int getOffset()
 		{
-			return element.getStartOffset();
+			return view.getStartOffset();
 		}
 		
 		public int getSide()
@@ -477,28 +559,28 @@ public class WebEditParagraphView extends ParagraphView
 		
 		public int getIntrinsicWidth()
 		{
-			return 0;
+			return (int)view.getPreferredSpan(View.X_AXIS);
 		}
 		
 		public int getIntrinsicHeight()
 		{
-			return 0;
+			return (int)view.getPreferredSpan(View.Y_AXIS);
 		}
 		
 		public int getWidth()
 		{
-			if (element.getAttributes().isDefined(CSS.Attribute.WIDTH))
+			if (view.getAttributes().isDefined(CSS.Attribute.WIDTH))
 			{
-				return Integer.parseInt((String)element.getAttributes().getAttribute(CSS.Attribute.WIDTH));
+				return Integer.parseInt((String)view.getAttributes().getAttribute(CSS.Attribute.WIDTH));
 			}
 			return getIntrinsicWidth();
 		}
 		
 		public int getHeight()
 		{
-			if (element.getAttributes().isDefined(CSS.Attribute.HEIGHT))
+			if (view.getAttributes().isDefined(CSS.Attribute.HEIGHT))
 			{
-				return Integer.parseInt((String)element.getAttributes().getAttribute(CSS.Attribute.HEIGHT));
+				return Integer.parseInt((String)view.getAttributes().getAttribute(CSS.Attribute.HEIGHT));
 			}
 			return getIntrinsicHeight();
 		}
@@ -506,19 +588,9 @@ public class WebEditParagraphView extends ParagraphView
 	
 	class FloatedImage extends FloatedElement
 	{
-		public FloatedImage(Element el)
+		public FloatedImage(AnchorView anchor)
 		{
-			super(el);
-		}
-		
-		public int getIntrinsicWidth()
-		{
-			return 100;
-		}
-		
-		public int getIntrinsicHeight()
-		{
-			return 50;
+			super(anchor.getImageView());
 		}
 	}
 	
@@ -563,21 +635,17 @@ public class WebEditParagraphView extends ParagraphView
 		}
 	}
 	
-	private void buildImageList()
+	void clearImages()
 	{
 		images.clear();
-		buildImageList(getElement());
 	}
 	
-	void invalidateImages()
+	void addImageAnchor(AnchorView anchor, int row)
 	{
-		Iterator it = images.iterator();
-		while (it.hasNext())
-		{
-			FloatedElement image = (FloatedElement)it.next();
-			image.setEnd(-1);
-			image.setStart(-1);
-		}
+		FloatedElement el = new FloatedImage(anchor);
+		el.setStart(row);
+		images.add(el);
+		log.info("Added image at "+row);
 	}
 	
 	void layoutImages(int rowIndex)
@@ -586,16 +654,7 @@ public class WebEditParagraphView extends ParagraphView
 		while (it.hasNext())
 		{
 			FloatedElement image = (FloatedElement)it.next();
-			if (image.getStart()==-1)
-			{
-				int pos = getViewIndex(image.getOffset(),Position.Bias.Forward);
-				if (pos==rowIndex)
-				{
-					image.setStart(pos+1);
-					log.info("Calculated image starts at "+(pos+1));
-				}
-			}
-			else if (image.getEnd()==-1)
+			if (image.getEnd()==-1)
 			{
 				int sum = 0;
 				for (int i=image.getStart(); i<=rowIndex; i++)
@@ -610,93 +669,6 @@ public class WebEditParagraphView extends ParagraphView
 				}
 			}
 		}
-	}
-	
-	private void buildImageList(Element el)
-	{
-		if (el.getAttributes().getAttribute(StyleConstants.NameAttribute)==HTML.Tag.IMG)
-		{
-			if (el.getAttributes().isDefined(CSS.Attribute.FLOAT))
-			{
-				images.add(new FloatedImage(el));
-			}
-		}
-		else
-		{
-			for (int i=0; i<el.getElementCount(); i++)
-			{
-				buildImageList(el.getElement(i));
-			}
-		}
-	}
-
-	protected static int getSpaceCount(String content)
-	{
-		int result = 0;
-		int index = content.indexOf(' ');
-		while (index >= 0)
-		{
-			result++;
-			index = content.indexOf(' ', index + 1);
-		}
-		return result;
-	}
-
-	protected static int[] getSpaceIndexes(String content, int shift)
-	{
-		int cnt = getSpaceCount(content);
-		int[] result = new int[cnt];
-		int counter = 0;
-		int index = content.indexOf(' ');
-		while (index >= 0)
-		{
-			result[counter] = index + shift;
-			counter++;
-			index = content.indexOf(' ', index + 1);
-		}
-		return result;
-	}
-
-	protected static boolean isContainSpace(View v)
-	{
-		int startOffset = v.getStartOffset();
-		int len = v.getEndOffset() - startOffset;
-		try
-		{
-			String text = v.getDocument().getText(startOffset, len);
-			if (text.indexOf(' ') >= 0)
-				return true;
-			else
-				return false;
-		}
-		catch (Exception ex)
-		{
-			return false;
-		}
-	}
-
-	public void setParent(View view)
-	{
-		super.setParent(view);
-		buildImageList();
-	}
-	
-	public void insertUpdate(DocumentEvent ev, Shape a, ViewFactory f)
-	{
-		super.insertUpdate(ev,a,f);
-		buildImageList();
-	}
-	
-	public void removeUpdate(DocumentEvent ev, Shape a, ViewFactory f)
-	{
-		super.removeUpdate(ev,a,f);
-		buildImageList();
-	}
-	
-	public void changedUpdate(DocumentEvent ev, Shape a, ViewFactory f)
-	{
-		super.changedUpdate(ev,a,f);
-		buildImageList();
 	}
 	
 	protected View createRow()
@@ -734,14 +706,14 @@ public class WebEditParagraphView extends ParagraphView
 		}
 		if (index==0)
 		{
-			log.info("Span is "+span);
+			//log.info("Span is "+span);
 		}
 		return span;
 	}
 	
 	protected void layout(int width, int height)
 	{
-		log.info("Layout "+width+" "+height);
+		//log.info("Layout "+width+" "+height);
 		super.layout(width,height);
 	}
 	
@@ -804,7 +776,7 @@ public class WebEditParagraphView extends ParagraphView
   
   protected void layoutMinorAxis(int targetSpan, int axis, int[] offsets, int[] spans)
 	{
-  	log.info("Layout span is "+targetSpan);
+  	//log.info("Layout span is "+targetSpan);
 		int n = getViewCount();
 		for (int i = 0; i<n; i++)
 		{
@@ -842,7 +814,7 @@ public class WebEditParagraphView extends ParagraphView
 			{
 				// can't make the child this wide, align it
 				float align = v.getAlignment(axis);
-				offsets[i]+=(int)((targetSpan-max)*align);
+				offsets[i]+=(int)((spans[i]-max)*align);
 				spans[i]=max;
 			}
 			else
@@ -879,7 +851,7 @@ public class WebEditParagraphView extends ParagraphView
 		}
 		if (index==0)
 		{
-			log.info("Start is "+len);
+			//log.info("Start is "+len);
 		}
 		return len;
 	}
