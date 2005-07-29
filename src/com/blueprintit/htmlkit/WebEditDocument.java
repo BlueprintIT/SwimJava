@@ -124,6 +124,15 @@ public class WebEditDocument extends HTMLDocument
 		}
 		List specs = new LinkedList();
 		
+		boolean joinPrevious=true;
+		Element character = getCharacterElement(offset);
+		if (character.getAttributes().getAttribute(StyleConstants.NameAttribute)==HTML.Tag.IMG)
+		{
+			joinPrevious=false;
+			//log.info("Adding to image");
+			//log.info(attr);
+		}
+		
 		Segment s = new Segment();
 		s.setPartialReturn(false);
 		ElementSpec spec;
@@ -146,7 +155,7 @@ public class WebEditDocument extends HTMLDocument
 					{
 						log.info("Adding content");
 						spec = new ElementSpec(attr,ElementSpec.ContentType,i-lastend);
-						if (lastend==start)
+						if ((lastend==start)&&(joinPrevious))
 						{
 							log.info("Joining with previous");
 							spec.setDirection(ElementSpec.JoinPreviousDirection);
@@ -181,9 +190,9 @@ public class WebEditDocument extends HTMLDocument
 				}
 			}
 			
-			if ((lastend<end)&&(specs.size()>0))
+			if ((lastend<end)&&((specs.size()>0)||(!joinPrevious)))
 			{
-				log.info("Adding content");
+				log.info("Adding last content");
 				spec = new ElementSpec(attr,ElementSpec.ContentType,end-lastend);
 				spec.setDirection(ElementSpec.JoinNextDirection);
 				specs.add(spec);
