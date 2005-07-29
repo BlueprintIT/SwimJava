@@ -26,6 +26,10 @@ public class WebEditTransferHandler extends TransferHandler
 	{
     for (int i = 0; i<flavors.length; i++)
 		{
+    	log.info(flavors[i].getMimeType());
+		}
+    for (int i = 0; i<flavors.length; i++)
+		{
 			String mime = flavors[i].getMimeType();
 			if (mime.startsWith("text/plain"))
 			{

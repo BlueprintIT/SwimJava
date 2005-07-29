@@ -96,7 +96,6 @@ public class AnchorView extends View
   
 	public void paint(Graphics g, Shape a)
 	{
-		log.info("Paint called");
 		if (isDisplayingImage())
 		{
 			image.paint(g, a);
@@ -189,7 +188,7 @@ public class AnchorView extends View
 		else
 		{
 			Rectangle alloc = (Rectangle) a;
-			if (x<alloc.x+alloc.width)
+			if (x<alloc.getX()+alloc.getWidth()/2)
 			{
 				bias[0] = Position.Bias.Forward;
 				return getStartOffset();

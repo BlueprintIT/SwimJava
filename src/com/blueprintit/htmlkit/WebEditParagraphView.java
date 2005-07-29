@@ -495,6 +495,7 @@ public class WebEditParagraphView extends ParagraphView
 	{
 		protected View view;
 		private int side;
+		private float remains = 0;
 		private int start = -1;
 		private int span = -1;
 		
@@ -511,6 +512,18 @@ public class WebEditParagraphView extends ParagraphView
 			{
 				side=RIGHT;
 			}
+			remains=getHeight();
+		}
+		
+		public float getRemains()
+		{
+			return remains;
+		}
+		
+		public void setRemains(float value)
+		{
+			//log.info("Set remains to "+value);
+			remains=value;
 		}
 		
 		public void paint(Graphics g, Rectangle a)
@@ -556,6 +569,11 @@ public class WebEditParagraphView extends ParagraphView
 		public int getHeight()
 		{
 			return (int)view.getPreferredSpan(View.Y_AXIS);
+		}
+		
+		public View getView()
+		{
+			return view;
 		}
 	}
 	
@@ -618,7 +636,7 @@ public class WebEditParagraphView extends ParagraphView
 		FloatedElement el = new FloatedImage(anchor);
 		el.setStart(row);
 		images.add(el);
-		log.info("Added image at "+row);
+		//log.info("Added image at "+row);
 	}
 	
 	void layoutImages(int rowIndex)
@@ -629,17 +647,18 @@ public class WebEditParagraphView extends ParagraphView
 			FloatedElement image = (FloatedElement)it.next();
 			if (image.getEnd()==-1)
 			{
-				int sum = 0;
+				float sum = 0;
 				for (int i=image.getStart(); i<=rowIndex; i++)
 				{
 					sum+=getView(i).getPreferredSpan(Y_AXIS);
 					if (sum>=image.getHeight())
 					{
 						image.setEnd(i);
-						log.info("Calculated image ends at "+i);
+						//log.info("Calculated image ends at "+i);
 						break;
 					}
 				}
+				image.setRemains(image.getHeight()-sum);
 			}
 		}
 	}
@@ -690,6 +709,34 @@ public class WebEditParagraphView extends ParagraphView
 		super.layout(width,height);
 	}
 	
+	protected SizeRequirements calculateMajorAxisRequirements(int axis, SizeRequirements r)
+	{
+		r = super.calculateMajorAxisRequirements(axis,r);
+		Iterator it = images.iterator();
+		float biggest = 0;
+		while (it.hasNext())
+		{
+			FloatedElement image = (FloatedElement)it.next();
+			if (image.getEnd()<0)
+			{
+				biggest=Math.max(biggest,image.getRemains());
+			}
+		}
+		int extra = (int)Math.ceil(biggest);
+		//log.info("Extra height of "+extra);
+		r.maximum+=extra;
+		r.minimum+=extra;
+		r.preferred+=extra;
+		//log.info("Asking for heights of "+r.minimum+" "+r.preferred+" "+r.maximum);
+		return r;
+	}
+	
+  protected void layoutMajorAxis(int targetSpan, int axis, int[] offsets, int[] spans)
+  {
+  	//log.info("Got height of "+targetSpan);
+  	super.layoutMajorAxis(targetSpan,axis,offsets,spans);
+  }
+  
   /*protected SizeRequirements calculateMinorAxisRequirements(int axis, SizeRequirements r)
 	{
 		if (r==null)
