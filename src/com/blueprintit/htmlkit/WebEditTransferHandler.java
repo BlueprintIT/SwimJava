@@ -24,10 +24,10 @@ public class WebEditTransferHandler extends TransferHandler
 
 	private DataFlavor getPreferredDataFlavor(DataFlavor[] flavors)
 	{
-    for (int i = 0; i<flavors.length; i++)
+    /*for (int i = 0; i<flavors.length; i++)
 		{
     	log.info(flavors[i].getMimeType());
-		}
+		}*/
     for (int i = 0; i<flavors.length; i++)
 		{
 			String mime = flavors[i].getMimeType();

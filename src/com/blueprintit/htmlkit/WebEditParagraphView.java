@@ -615,7 +615,13 @@ public class WebEditParagraphView extends ParagraphView
 				{
 					tempRect.x = alloc.x+alloc.width-image.getWidth();
 				}
-				tempRect.y = y+getOffset(Y_AXIS, image.getStart());
+				tempRect.y=y;
+				int i = image.getStart();
+				if (i>0)
+				{
+					tempRect.y += getOffset(Y_AXIS, i-1);
+					tempRect.y += getSpan(Y_AXIS, i-1);
+				}
 				tempRect.width = image.getWidth();
 				tempRect.height = image.getHeight();
 				if (tempRect.intersects(clip))
