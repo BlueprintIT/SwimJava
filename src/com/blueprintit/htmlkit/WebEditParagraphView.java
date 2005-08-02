@@ -602,7 +602,7 @@ public class WebEditParagraphView extends ParagraphView
 		while (it.hasNext())
 		{
 			FloatedElement image = (FloatedElement)it.next();
-			if (image.getStart()>0)
+			if (image.getStart()>=0)
 			{
 				int x = alloc.x+getLeftInset();
 				int y = alloc.y+getTopInset();
