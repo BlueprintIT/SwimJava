@@ -16,10 +16,13 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.Caret;
 import javax.swing.text.Document;
 import javax.swing.text.Element;
+import javax.swing.text.MutableAttributeSet;
 import javax.swing.text.ParagraphView;
+import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
+import javax.swing.text.html.CSS;
 import javax.swing.text.html.HTML;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLEditorKit;
@@ -51,6 +54,54 @@ public class WebEditEditorKit extends HTMLEditorKit
 	
   private ViewFactory defaultFactory = new WebEditFactory();
 	
+  public static class FloatLeftAction extends StyledTextAction
+  {
+  	public FloatLeftAction(String name)
+  	{
+  		super(name);
+  	}
+
+  	public void actionPerformed(ActionEvent e)
+		{
+			MutableAttributeSet attrs = new SimpleAttributeSet();
+			attrs.addAttribute(CSS.Attribute.FLOAT,"left");
+			JEditorPane pane = getEditor(e);
+			setCharacterAttributes(pane,attrs,false);
+		}
+  }
+  
+  public static class FloatRightAction extends StyledTextAction
+  {
+  	public FloatRightAction(String name)
+  	{
+  		super(name);
+  	}
+
+  	public void actionPerformed(ActionEvent e)
+		{
+			MutableAttributeSet attrs = new SimpleAttributeSet();
+			attrs.addAttribute(CSS.Attribute.FLOAT,"right");
+			JEditorPane pane = getEditor(e);
+			setCharacterAttributes(pane,attrs,false);
+		}
+  }
+  
+  public static class FloatNoneAction extends StyledTextAction
+  {
+  	public FloatNoneAction(String name)
+  	{
+  		super(name);
+  	}
+
+  	public void actionPerformed(ActionEvent e)
+		{
+			JEditorPane pane = getEditor(e);
+			WebEditDocument doc = (WebEditDocument)pane.getDocument();
+			int start = pane.getSelectionStart();
+			doc.removeCharacterAttribute(start,pane.getSelectionEnd()-start,CSS.Attribute.FLOAT);
+		}
+  }
+  
 	public static class ToggleListAction extends StyledTextAction
 	{
 		private HTML.Tag ltype;

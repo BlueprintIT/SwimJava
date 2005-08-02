@@ -219,6 +219,13 @@ public class WebEditDocument extends HTMLDocument
 		}
 		LinkedList elements = new LinkedList();
 		Element element = getCharacterElement(start);
+		if (start==end)
+		{
+			if (element.getStartOffset()==start)
+			{
+				element=getCharacterElement(start-1);
+			}
+		}
 		elements.add(element);
 		while (element.getEndOffset()<end)
 		{

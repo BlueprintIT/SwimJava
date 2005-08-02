@@ -9,8 +9,8 @@ package com.blueprintit.htmlkit;
 import java.awt.Graphics;
 import java.awt.Rectangle;
 import java.awt.Shape;
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 
 import javax.swing.SizeRequirements;
@@ -585,7 +585,7 @@ public class WebEditParagraphView extends ParagraphView
 		}
 	}
 	
-	private List images = new ArrayList();
+	private List floats = new LinkedList();
 	
 	public WebEditParagraphView(Element elem)
 	{
@@ -596,37 +596,55 @@ public class WebEditParagraphView extends ParagraphView
 	public void paint(Graphics g, Shape a)
 	{
 		super.paint(g, a);
-		Iterator it = images.iterator();
 		Rectangle alloc = (a instanceof Rectangle) ? (Rectangle) a : a.getBounds();
 		Rectangle tempRect = new Rectangle();
-		while (it.hasNext())
+		for (int im=0; im<floats.size(); im++)
 		{
-			FloatedElement image = (FloatedElement)it.next();
-			if (image.getStart()>=0)
+			FloatedElement element = (FloatedElement)floats.get(im);
+			int start = element.getStart();
+			if (element.getStart()>=0)
 			{
-				int x = alloc.x+getLeftInset();
-				int y = alloc.y+getTopInset();
-				Rectangle clip = g.getClipBounds();
-				if (image.getSide()==LEFT)
+				int left = alloc.x+getLeftInset();
+				int top = alloc.y+getTopInset();
+				int right = alloc.x+alloc.width-getRightInset();
+				for (int i=0; i<im; i++)
 				{
-					tempRect.x = x;
+					FloatedElement prev = (FloatedElement)floats.get(i);
+					if ((prev.getStart()>=0)&&(prev.getSide()==element.getSide()))
+					{
+						if ((prev.getStart()<=start)&&((prev.getEnd()<0)||(prev.getEnd()>=start)))
+						{
+							if (prev.getSide()==LEFT)
+							{
+								left+=prev.getWidth();
+							}
+							else
+							{
+								right-=prev.getWidth();
+							}
+						}
+					}
+				}
+				if (element.getSide()==LEFT)
+				{
+					tempRect.x = left;
 				}
 				else
 				{
-					tempRect.x = alloc.x+alloc.width-image.getWidth();
+					tempRect.x = right-element.getWidth();
 				}
-				tempRect.y=y;
-				int i = image.getStart();
-				if (i>0)
+				tempRect.y=top;
+				if (start>0)
 				{
-					tempRect.y += getOffset(Y_AXIS, i-1);
-					tempRect.y += getSpan(Y_AXIS, i-1);
+					tempRect.y += getOffset(Y_AXIS, start-1);
+					tempRect.y += getSpan(Y_AXIS, start-1);
 				}
-				tempRect.width = image.getWidth();
-				tempRect.height = image.getHeight();
+				tempRect.width = element.getWidth();
+				tempRect.height = element.getHeight();
+				Rectangle clip = g.getClipBounds();
 				if (tempRect.intersects(clip))
 				{
-					image.paint(g, tempRect);
+					element.paint(g, tempRect);
 				}
 			}
 		}
@@ -634,37 +652,37 @@ public class WebEditParagraphView extends ParagraphView
 	
 	void clearImages()
 	{
-		images.clear();
+		floats.clear();
 	}
 	
 	void addImageAnchor(AnchorView anchor, int row)
 	{
 		FloatedElement el = new FloatedImage(anchor);
 		el.setStart(row);
-		images.add(el);
-		//log.info("Added image at "+row);
+		floats.add(el);
+		//log.info("Added element at "+row);
 	}
 	
 	void layoutImages(int rowIndex)
 	{
-		Iterator it = images.iterator();
+		Iterator it = floats.iterator();
 		while (it.hasNext())
 		{
-			FloatedElement image = (FloatedElement)it.next();
-			if (image.getEnd()==-1)
+			FloatedElement element = (FloatedElement)it.next();
+			if (element.getEnd()==-1)
 			{
 				float sum = 0;
-				for (int i=image.getStart(); i<=rowIndex; i++)
+				for (int i=element.getStart(); i<=rowIndex; i++)
 				{
 					sum+=getView(i).getPreferredSpan(Y_AXIS);
-					if (sum>=image.getHeight())
+					if (sum>=element.getHeight())
 					{
-						image.setEnd(i);
-						//log.info("Calculated image ends at "+i);
+						element.setEnd(i);
+						//log.info("Calculated element ends at "+i);
 						break;
 					}
 				}
-				image.setRemains(image.getHeight()-sum);
+				element.setRemains(element.getHeight()-sum);
 			}
 		}
 	}
@@ -678,21 +696,21 @@ public class WebEditParagraphView extends ParagraphView
 	public int getFlowSpan(int index)
 	{
 		int span = super.getFlowSpan(index);
-		Iterator it = images.iterator();
+		Iterator it = floats.iterator();
 		while (it.hasNext())
 		{
-			FloatedElement image = (FloatedElement)it.next();
-			int start = image.getStart();
+			FloatedElement element = (FloatedElement)it.next();
+			int start = element.getStart();
 			if (start>=0)
 			{
-				int end = image.getEnd();
+				int end = element.getEnd();
 				if (end<0)
 				{
 					end=getViewCount();
 				}
 				if ((start<=index)&&(end>=index))
 				{
-					span-=image.getWidth();
+					span-=element.getWidth();
 				}
 			}
 		}
@@ -718,14 +736,14 @@ public class WebEditParagraphView extends ParagraphView
 	protected SizeRequirements calculateMajorAxisRequirements(int axis, SizeRequirements r)
 	{
 		r = super.calculateMajorAxisRequirements(axis,r);
-		Iterator it = images.iterator();
+		Iterator it = floats.iterator();
 		float biggest = 0;
 		while (it.hasNext())
 		{
-			FloatedElement image = (FloatedElement)it.next();
-			if (image.getEnd()<0)
+			FloatedElement element = (FloatedElement)it.next();
+			if (element.getEnd()<0)
 			{
-				biggest=Math.max(biggest,image.getRemains());
+				biggest=Math.max(biggest,element.getRemains());
 			}
 		}
 		int extra = (int)Math.ceil(biggest);
@@ -809,25 +827,25 @@ public class WebEditParagraphView extends ParagraphView
 			offsets[i] = 0;
 			spans[i] = targetSpan;
 		}
-		Iterator it = images.iterator();
+		Iterator it = floats.iterator();
 		while (it.hasNext())
 		{
-			FloatedElement image = (FloatedElement) it.next();
-			int start = image.getStart();
+			FloatedElement element = (FloatedElement) it.next();
+			int start = element.getStart();
 			if (start>=0)
 			{
-				int end = image.getEnd();
+				int end = element.getEnd();
 				if (end<0)
 				{
 					end=n-1;
 				}
 				for (int i = start; i<=end; i++)
 				{
-					if (image.getSide()==LEFT)
+					if (element.getSide()==LEFT)
 					{
-						offsets[i] += image.getWidth();
+						offsets[i] += element.getWidth();
 					}
-					spans[i] -= image.getWidth();
+					spans[i] -= element.getWidth();
 				}
 			}
 		}
@@ -854,19 +872,19 @@ public class WebEditParagraphView extends ParagraphView
 	public int getFlowStart(int index)
 	{
 		int len = super.getFlowStart(index);
-		Iterator it = images.iterator();
+		Iterator it = floats.iterator();
 		while (it.hasNext())
 		{
-			FloatedElement image = (FloatedElement)it.next();
-			if (image.getSide()==LEFT)
+			FloatedElement element = (FloatedElement)it.next();
+			if (element.getSide()==LEFT)
 			{
-				int start = image.getStart();
+				int start = element.getStart();
 				if (start>=0)
 				{
-					int end = image.getEnd();
+					int end = element.getEnd();
 					if ((start<=index)&&(end>=index))
 					{
-						len+=image.getWidth();
+						len+=element.getWidth();
 					}
 				}
 			}
