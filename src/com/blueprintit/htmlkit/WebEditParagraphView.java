@@ -131,9 +131,14 @@ public class WebEditParagraphView extends ParagraphView
 				
 				if ((v instanceof AnchorView)&&(((AnchorView)v).isDisplayingAnchor()))
 				{
-					fv.addImageAnchor((AnchorView)v, imageRow);
-					pos=v.getEndOffset();
+					//log.info("Found image anchor");
 					chunkSpan = (int)v.getPreferredSpan(flowAxis);
+					if (chunkSpan>remaining)
+					{
+						// Image anchor won't fit into row, better to bail out now
+						break;
+					}
+					fv.addImageAnchor((AnchorView)v, imageRow);
 					if (imageRow==rowIndex)
 					{
 						indent = fv.getFlowStart(imageRow);
@@ -142,6 +147,7 @@ public class WebEditParagraphView extends ParagraphView
 				}
 				else
 				{
+					//log.info("Found normal view");
 					imageRow=rowIndex+1;
 
 					if (justified)
