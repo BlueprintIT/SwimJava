@@ -2,6 +2,8 @@ package com.blueprintit.swim;
 
 import java.awt.event.ActionEvent;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 
 import javax.swing.AbstractAction;
@@ -30,7 +32,7 @@ import com.blueprintit.xui.UserInterface;
 
 public class PageBrowser implements InterfaceListener
 {
-	private class Page
+	private class Page implements Comparable
 	{
 		private String container;
 		private String id;
@@ -72,6 +74,22 @@ public class PageBrowser implements InterfaceListener
 				}
 			}
 			return preview;
+		}
+
+		public int compareTo(Object o)
+		{
+			if (o instanceof Page)
+			{
+				return title.compareTo(((Page)o).title);
+			}
+			else if (o instanceof String)
+			{
+				return title.compareTo(o.toString());
+			}
+			else
+			{
+				throw new IllegalArgumentException("Can only compare a page to another page or a string");
+			}
 		}
 	}
 	
@@ -150,12 +168,19 @@ public class PageBrowser implements InterfaceListener
 	{
 		editorKit = new WebEditEditorKit();
 		editorPane.setEditorKit(editorKit);
-		DefaultListModel model = new DefaultListModel();
+		ArrayList elements = new ArrayList();
 		Iterator it = list.getRootElement().getDescendants(new ElementFilter("page"));
 		while (it.hasNext())
 		{
 			Element el = (Element)it.next();
-			model.addElement(new Page(el));
+			elements.add(new Page(el));
+		}
+		Collections.sort(elements);
+		DefaultListModel model = new DefaultListModel();
+		it = elements.iterator();
+		while (it.hasNext())
+		{
+			model.addElement(it.next());
 		}
 		pageList.setModel(model);
 		pageList.addListSelectionListener(new ListSelectionListener() {
