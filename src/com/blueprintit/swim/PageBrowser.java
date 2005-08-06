@@ -1,10 +1,17 @@
+/*
+ * $HeadURL$
+ * $LastChangedBy$
+ * $Date$
+ * $Revision$
+ */
 package com.blueprintit.swim;
 
 import java.awt.event.ActionEvent;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.Map;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -14,7 +21,6 @@ import javax.swing.JEditorPane;
 import javax.swing.JList;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
-import javax.swing.text.StyledDocument;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLEditorKit;
 
@@ -32,72 +38,12 @@ import com.blueprintit.xui.UserInterface;
 
 public class PageBrowser implements InterfaceListener
 {
-	private class Page implements Comparable
-	{
-		private String container;
-		private String id;
-		private String title;
-		private HTMLDocument preview;
-		
-		public Page(Element element)
-		{
-			id=element.getAttributeValue("id");
-			container=element.getParentElement().getAttributeValue("id");
-			title=element.getAttributeValue("title");
-		}
-		
-		public String toString()
-		{
-			return title;
-		}
-		
-		public String getResource()
-		{
-			return container+"/page/"+id;
-		}
-		
-		public StyledDocument getPreview()
-		{
-			if (preview==null)
-			{
-				try
-				{
-					Request request = swim.getRequest("preview",getResource());
-					URL url = request.encode();
-					preview = (HTMLDocument)editorKit.createDefaultDocument();
-					preview.setBase(url);
-					editorKit.read(request.openReader(),preview,0);
-				}
-				catch (Exception e)
-				{
-					log.error("Unable to retrieve preview.",e);
-				}
-			}
-			return preview;
-		}
-
-		public int compareTo(Object o)
-		{
-			if (o instanceof Page)
-			{
-				return title.compareTo(((Page)o).title);
-			}
-			else if (o instanceof String)
-			{
-				return title.compareTo(o.toString());
-			}
-			else
-			{
-				throw new IllegalArgumentException("Can only compare a page to another page or a string");
-			}
-		}
-	}
-	
 	private Logger log = Logger.getLogger(this.getClass());
 
 	private SwimInterface swim;
 	private Document list;
 	private HTMLEditorKit editorKit;
+	private Map previews = new Hashtable();
 	
 	public JDialog dialog;
 	public JList pageList;
@@ -123,7 +69,7 @@ public class PageBrowser implements InterfaceListener
 		this.swim=swim;
 	}
 	
-	public String choosePage(String current)
+	public Page choosePage(String current)
 	{
 		try
 		{
@@ -145,7 +91,7 @@ public class PageBrowser implements InterfaceListener
 			Page page = (Page)pageList.getSelectedValue();
 			if (page!=null)
 			{
-				return page.getResource();
+				return page;
 			}
 			return null;
 		}
@@ -159,9 +105,14 @@ public class PageBrowser implements InterfaceListener
 		}		
 	}
 	
-	public String choosePage()
+	public Page choosePage(Page current)
 	{
-		return choosePage(null);
+		return choosePage(current.getResource());
+	}
+	
+	public Page choosePage()
+	{
+		return choosePage((String)null);
 	}
 
 	public void interfaceCreated(InterfaceEvent ev)
@@ -173,7 +124,7 @@ public class PageBrowser implements InterfaceListener
 		while (it.hasNext())
 		{
 			Element el = (Element)it.next();
-			elements.add(new Page(el));
+			elements.add(new Page(swim,el));
 		}
 		Collections.sort(elements);
 		DefaultListModel model = new DefaultListModel();
@@ -188,7 +139,23 @@ public class PageBrowser implements InterfaceListener
 			public void valueChanged(ListSelectionEvent ev)
 			{
 				Page page = (Page)pageList.getSelectedValue();
-				editorPane.setDocument(page.getPreview());
+				HTMLDocument preview=(HTMLDocument)previews.get(page);
+				if (!previews.containsKey(page))
+				{
+					try
+					{
+						Request request = page.getPreviewRequest();
+						preview = (HTMLDocument)editorKit.createDefaultDocument();
+						preview.setBase(request.encode());
+						editorKit.read(request.openReader(),preview,0);
+						previews.put(page,preview);
+					}
+					catch (Exception e)
+					{
+						log.error("Unable to retrieve preview.",e);
+					}
+				}
+				editorPane.setDocument(preview);
 			}
 		});
 	}

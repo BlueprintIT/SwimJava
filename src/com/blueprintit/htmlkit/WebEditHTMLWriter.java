@@ -17,8 +17,12 @@ import javax.swing.text.html.CSS;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLWriter;
 
+import org.apache.log4j.Logger;
+
 public class WebEditHTMLWriter extends HTMLWriter
 {
+	private Logger log = Logger.getLogger(this.getClass());
+
 	public WebEditHTMLWriter(Writer w, HTMLDocument doc)
 	{
 		super(w,doc);
@@ -30,16 +34,16 @@ public class WebEditHTMLWriter extends HTMLWriter
 	}
 
   /**
-   * Writes out the attribute set.  Ignores all
-   * attributes with a key of type HTML.Tag,
-   * attributes with a key of type StyleConstants,
-   * and attributes with a key of type
-   * HTML.Attribute.ENDTAG.
-   *
-   * @param attr   an AttributeSet
-   * @exception IOException on any I/O error
-   *
-   */
+	 * Writes out the attribute set. Ignores all attributes with a key of type
+	 * HTML.Tag, attributes with a key of type StyleConstants, and attributes with
+	 * a key of type HTML.Attribute.ENDTAG.
+	 * 
+	 * @param attr
+	 *          an AttributeSet
+	 * @exception IOException
+	 *              on any I/O error
+	 * 
+	 */
   protected void writeAttributes(AttributeSet attr) throws IOException
   {
   	MutableAttributeSet conv = new SimpleAttributeSet(attr);

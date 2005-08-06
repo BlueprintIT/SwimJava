@@ -10,11 +10,13 @@ import java.io.BufferedReader;
 import java.io.Writer;
 import java.io.IOException;
 import java.net.URL;
+import java.util.Iterator;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.jdom.Document;
 import org.jdom.Element;
+import org.jdom.filter.ElementFilter;
 import org.jdom.input.SAXBuilder;
 
 public class SwimInterface
@@ -62,7 +64,8 @@ public class SwimInterface
 		try
 		{
 			Request request = getRequest("list",path);
-			request.getQuery().put("version",version);
+			if (version!=null)
+				request.getQuery().put("version",version);
 			SAXBuilder builder = new SAXBuilder();
 			Document document = builder.build(request.encode());
 			return document.getRootElement();
@@ -81,6 +84,21 @@ public class SwimInterface
 	public PageBrowser getPageBrowser()
 	{
 		return new PageBrowser(this);
+	}
+	
+	public Page getPage(String resource)
+	{
+		Element el = loadList("",null);
+		Iterator it = el.getDescendants(new ElementFilter("page"));
+		while (it.hasNext())
+		{
+			Page page = new Page(this,(Element)it.next());
+			if (resource.equals(page.getResource()))
+			{
+				return page;
+			}
+		}
+		return null;
 	}
 	
 	public String getResource(String path, String version) throws IOException

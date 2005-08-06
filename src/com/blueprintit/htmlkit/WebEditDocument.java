@@ -5,6 +5,7 @@ import java.util.List;
 
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.UndoableEditEvent;
+import javax.swing.text.DefaultStyledDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Element;
@@ -22,9 +23,18 @@ public class WebEditDocument extends HTMLDocument
 {
 	private Logger log = Logger.getLogger(this.getClass());
 
+	private class WebEditElementBuffer extends DefaultStyledDocument.ElementBuffer
+	{
+		public WebEditElementBuffer(Element root)
+		{
+			super(root);
+		}
+	}
+	
 	public WebEditDocument(StyleSheet ss)
 	{
 		super(ss);
+		buffer = new WebEditElementBuffer(createDefaultRoot());
 	}
 
 	public HTML.Tag getParagraphTag(int offset)
@@ -92,15 +102,21 @@ public class WebEditDocument extends HTMLDocument
 		Element paragraph;
 		for (int j = 0; j<stack.size(); j++)
 		{
-			log.info("End tag");
+			log.debug("End tag");
 			specs.add(new ElementSpec(null,ElementSpec.EndTagType));
 		}
 		for (int j = stack.size(); --j>=0;)
 		{
-			log.info("Start tag");
+			log.debug("Start tag");
 			paragraph = (Element)stack.get(j);
 			specs.add(new ElementSpec(paragraph.getAttributes(),ElementSpec.StartTagType));
 		}
+	}
+	
+	protected void removeUpdate(DefaultDocumentEvent chng)
+	{
+		log.info("RemoveUpdate "+chng.getOffset()+" "+chng.getLength());
+		super.removeUpdate(chng);
 	}
 	
   protected void insertUpdate(DefaultDocumentEvent chng, AttributeSet attr)
@@ -110,7 +126,7 @@ public class WebEditDocument extends HTMLDocument
 		List stack = new LinkedList();
 		boolean fracture=false;
 		Element paragraph = getParagraphElement(offset+length);
-		if (offset>paragraph.getStartOffset())
+		if ((offset>paragraph.getStartOffset())||(offset==0))
 		{
 			fracture=true;
 		}
@@ -129,8 +145,7 @@ public class WebEditDocument extends HTMLDocument
 		if (character.getAttributes().getAttribute(StyleConstants.NameAttribute)==HTML.Tag.IMG)
 		{
 			joinPrevious=false;
-			//log.info("Adding to image");
-			//log.info(attr);
+			log.debug("Adding to image");
 		}
 		
 		Segment s = new Segment();
@@ -153,16 +168,16 @@ public class WebEditDocument extends HTMLDocument
 				{
 					if (lastend<i)
 					{
-						log.info("Adding content");
+						log.debug("Adding content");
 						spec = new ElementSpec(attr,ElementSpec.ContentType,i-lastend);
 						if ((lastend==start)&&(joinPrevious))
 						{
-							log.info("Joining with previous");
+							log.debug("Joining with previous");
 							spec.setDirection(ElementSpec.JoinPreviousDirection);
 						}
 						specs.add(spec);
 					}
-					log.info("Adding newline content");
+					log.debug("Adding newline content");
 					specs.add(new ElementSpec(attr,ElementSpec.ContentType,1));
 					insertNewlineSpecs(specs,stack);
 					lastend=i+1;
@@ -177,12 +192,12 @@ public class WebEditDocument extends HTMLDocument
 				{
 					if (fracture)
 					{
-						log.info("Fracturing");
+						log.debug("Fracturing");
 						spec.setDirection(ElementSpec.JoinFractureDirection);
 					}
 					else
 					{
-						log.info("Joining");
+						log.debug("Joining");
 						spec.setDirection(ElementSpec.JoinNextDirection);
 					}
 					pos--;
@@ -192,7 +207,7 @@ public class WebEditDocument extends HTMLDocument
 			
 			if ((lastend<end)&&((specs.size()>0)||(!joinPrevious)))
 			{
-				log.info("Adding last content");
+				log.debug("Adding last content");
 				spec = new ElementSpec(attr,ElementSpec.ContentType,end-lastend);
 				spec.setDirection(ElementSpec.JoinNextDirection);
 				specs.add(spec);
@@ -208,7 +223,7 @@ public class WebEditDocument extends HTMLDocument
 		{
 		}
 	}
-  	
+  
 	public java.util.Iterator getCharacterElementIterator(int start, int end)
 	{
 		if (end<start)

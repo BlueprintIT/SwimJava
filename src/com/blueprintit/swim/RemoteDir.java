@@ -1,3 +1,9 @@
+/*
+ * $HeadURL$
+ * $LastChangedBy$
+ * $Date$
+ * $Revision$
+ */
 package com.blueprintit.swim;
 
 import java.util.ArrayList;
