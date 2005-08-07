@@ -8,7 +8,7 @@ package com.blueprintit.swim;
 
 import org.jdom.Element;
 
-public class Page
+public class Page implements Comparable
 {
 	private String container;
 	private String id;

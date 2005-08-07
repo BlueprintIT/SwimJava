@@ -1386,7 +1386,8 @@ public class WebEditDocument extends HTMLDocument
 	public WebEditDocument(StyleSheet ss)
 	{
 		super(ss);
-		buffer = new WebEditElementBuffer(createDefaultRoot());
+		webuffer = new WebEditElementBuffer(createDefaultRoot());
+		buffer=webuffer;
 	}
 
   /**
@@ -1530,6 +1531,27 @@ public class WebEditDocument extends HTMLDocument
 	{
 		log.info("RemoveUpdate "+chng.getOffset()+" "+chng.getLength());
 		super.removeUpdate(chng);
+	}
+	
+	void updateStructure(int offset, ElementSpec[] specs)
+	{
+		try
+		{
+			writeLock();
+			int length=0;
+			for (int i=0; i<specs.length; i++)
+			{
+				length+=specs[i].getLength();
+			}
+	    DefaultDocumentEvent chng = new DefaultDocumentEvent(offset, length, DocumentEvent.EventType.CHANGE);
+			buffer.remove(offset,length,chng);
+			buffer.insert(offset,length,specs,chng);
+			fireChangedUpdate(chng);
+		}
+		finally
+		{
+			writeUnlock();
+		}
 	}
 	
   protected void insertUpdate(DefaultDocumentEvent chng, AttributeSet attr)

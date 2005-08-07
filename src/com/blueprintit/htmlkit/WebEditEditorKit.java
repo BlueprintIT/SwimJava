@@ -10,6 +10,8 @@ import java.awt.event.ActionEvent;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
 import javax.swing.JEditorPane;
 import javax.swing.text.BadLocationException;
@@ -22,6 +24,7 @@ import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
+import javax.swing.text.DefaultStyledDocument.ElementSpec;
 import javax.swing.text.html.CSS;
 import javax.swing.text.html.HTML;
 import javax.swing.text.html.HTMLDocument;
@@ -209,6 +212,178 @@ public class WebEditEditorKit extends HTMLEditorKit
 			{
 				log.error(e);
 			}
+		}
+	}
+	
+	public static class IncreaseListLevelAction extends StyledTextAction
+	{
+		private HTML.Tag ltype;
+		private Logger log = Logger.getLogger(this.getClass());
+		
+		public IncreaseListLevelAction(String name, HTML.Tag type)
+		{
+			super(name);
+			this.ltype=type;
+		}
+		
+		private boolean isListBlock(Element el)
+		{
+			Object o = el.getAttributes().getAttribute(StyleConstants.NameAttribute);
+			if (o!=null)
+			{
+				if ((o==HTML.Tag.UL)||(o==HTML.Tag.OL))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+		
+		private List buildListStack(Element el)
+		{
+			List base;
+			Element par = el.getParentElement();
+			if (par!=null)
+			{
+				base=buildListStack(par);
+			}
+			else
+			{
+				base = new LinkedList();
+			}
+			if (isListBlock(el))
+			{
+				base.add(el);
+			}
+			return base;
+		}
+		
+		public void actionPerformed(ActionEvent ev)
+		{
+			MutableAttributeSet newattrs = new SimpleAttributeSet();
+			MutableAttributeSet liattrs = new SimpleAttributeSet();
+			MutableAttributeSet piattrs = new SimpleAttributeSet();
+			
+			newattrs.addAttribute(StyleConstants.NameAttribute,ltype);
+			liattrs.addAttribute(StyleConstants.NameAttribute,HTML.Tag.LI);
+			piattrs.addAttribute(StyleConstants.NameAttribute,HTML.Tag.IMPLIED);
+			
+			JEditorPane editorPane = getEditor(ev);
+			WebEditDocument document = (WebEditDocument)editorPane.getDocument();
+			WebEditEditorKit editorKit = (WebEditEditorKit)editorPane.getEditorKit();
+			Caret caret = editorPane.getCaret();
+			int start = caret.getDot();
+			int end = caret.getMark();
+			if (end<start)
+			{
+				int temp = end;
+				end=start;
+				start=temp;
+			}
+			List specs = new LinkedList();
+			Iterator it = document.getParagraphElementIterator(caret.getDot(),caret.getMark());
+			Element el = (Element)it.next();
+			int offset=el.getStartOffset();
+			List stack = buildListStack(el);
+			for (int i=0; i<stack.size(); i++)
+			{
+				Element par = (Element)stack.get(i);
+				if (par.getStartOffset()==el.getStartOffset())
+				{
+					log.info("Start element "+par.getName());
+					specs.add(new ElementSpec(par.getAttributes(),ElementSpec.StartTagType));
+				}
+			}
+			boolean ingenerated=true;
+			log.info("Add new list");
+			specs.add(new ElementSpec(newattrs,ElementSpec.StartTagType));
+			log.info("Start list item");
+			specs.add(new ElementSpec(liattrs,ElementSpec.StartTagType));
+			specs.add(new ElementSpec(piattrs,ElementSpec.StartTagType));
+			int n = el.getElementCount();
+			for (int i=0; i<n; i++)
+			{
+				Element content = el.getElement(i);
+				specs.add(new ElementSpec(content.getAttributes(),ElementSpec.ContentType,content.getEndOffset()-content.getStartOffset()));
+			}
+			specs.add(new ElementSpec(null,ElementSpec.EndTagType));
+			specs.add(new ElementSpec(null,ElementSpec.EndTagType));
+			log.info("End list item");
+			while (it.hasNext())
+			{
+				el = (Element)it.next();
+				List newstack = buildListStack(el);
+				int i=0;
+				while ((i<stack.size())&&(i<newstack.size()))
+				{
+					if (stack.get(i)!=newstack.get(i))
+						break;
+					i++;
+				}
+				if (i<stack.size())
+				{
+					log.info("Ending generated list");
+					specs.add(new ElementSpec(null,ElementSpec.EndTagType));
+					ingenerated=false;
+					for (int j=stack.size()-1; j>=i; j--)
+					{
+						log.info("End element");
+						specs.add(new ElementSpec(null,ElementSpec.EndTagType));
+					}
+				}
+				if (i<newstack.size())
+				{
+					if (ingenerated)
+					{
+						log.info("Ending generated list");
+						specs.add(new ElementSpec(null,ElementSpec.EndTagType));
+						ingenerated=false;
+					}
+					while (i<newstack.size())
+					{
+						Element par = (Element)newstack.get(i);
+						log.info("Start element "+par.getName());
+						specs.add(new ElementSpec(par.getAttributes(),ElementSpec.StartTagType));
+						i++;
+					}
+				}
+				if (!ingenerated)
+				{
+					log.info("Add new list");
+					specs.add(new ElementSpec(newattrs,ElementSpec.StartTagType));
+					ingenerated=true;
+				}
+				log.info("Start list item");
+				specs.add(new ElementSpec(liattrs,ElementSpec.StartTagType));
+				specs.add(new ElementSpec(piattrs,ElementSpec.StartTagType));
+				n = el.getElementCount();
+				for (i=0; i<n; i++)
+				{
+					Element content = el.getElement(i);
+					specs.add(new ElementSpec(content.getAttributes(),ElementSpec.ContentType,content.getEndOffset()-content.getStartOffset()));
+				}
+				specs.add(new ElementSpec(null,ElementSpec.EndTagType));
+				specs.add(new ElementSpec(null,ElementSpec.EndTagType));
+				log.info("End list item");
+				stack=newstack;
+			}
+			if (ingenerated)
+			{
+				log.info("Ending generated list");
+				specs.add(new ElementSpec(null,ElementSpec.EndTagType));
+				ingenerated=false;
+			}
+			for (int i=stack.size()-1; i>=0; i--)
+			{
+				Element par = (Element)stack.get(i);
+				if (par.getEndOffset()==el.getEndOffset())
+				{
+					log.info("End element");
+					specs.add(new ElementSpec(null,ElementSpec.EndTagType));
+				}
+			}
+			ElementSpec[] results = (ElementSpec[])specs.toArray(new ElementSpec[0]);
+			document.updateStructure(offset,results);
 		}
 	}
 	
