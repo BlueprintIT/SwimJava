@@ -601,6 +601,7 @@ public class WebEditParagraphView extends ParagraphView
 
 	public void paint(Graphics g, Shape a)
 	{
+		log.debug("paint");
 		super.paint(g, a);
 		Rectangle alloc = (a instanceof Rectangle) ? (Rectangle) a : a.getBounds();
 		Rectangle tempRect = new Rectangle();

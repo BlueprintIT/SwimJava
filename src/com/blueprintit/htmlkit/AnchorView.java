@@ -90,6 +90,7 @@ public class AnchorView extends View
   
   public void changedUpdate(DocumentEvent e, Shape a, ViewFactory f)
   {
+  	log.debug("changedUpdate");
   	super.changedUpdate(e,a,f);
   	image.changedUpdate(e,a,f);
   }
@@ -181,21 +182,14 @@ public class AnchorView extends View
 
 	public int viewToModel(float x, float y, Shape a, Position.Bias[] bias)
 	{
-		if (isDisplayingImage())
+		Rectangle alloc = (Rectangle) a;
+		if (x<alloc.getX()+alloc.getWidth()/2)
 		{
-			return image.viewToModel(x,y,a,bias);
+			bias[0] = Position.Bias.Forward;
+			return getStartOffset();
 		}
-		else
-		{
-			Rectangle alloc = (Rectangle) a;
-			if (x<alloc.getX()+alloc.getWidth()/2)
-			{
-				bias[0] = Position.Bias.Forward;
-				return getStartOffset();
-			}
-			bias[0] = Position.Bias.Backward;
-			return getEndOffset();
-		}
+		bias[0] = Position.Bias.Backward;
+		return getEndOffset();
 	}
 
 	public void setSize(float width, float height)

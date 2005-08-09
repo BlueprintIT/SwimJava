@@ -17,12 +17,8 @@ import javax.swing.text.html.CSS;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLWriter;
 
-import org.apache.log4j.Logger;
-
 public class WebEditHTMLWriter extends HTMLWriter
 {
-	private Logger log = Logger.getLogger(this.getClass());
-
 	public WebEditHTMLWriter(Writer w, HTMLDocument doc)
 	{
 		super(w,doc);
