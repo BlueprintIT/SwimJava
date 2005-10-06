@@ -9,7 +9,10 @@ package com.blueprintit.htmlkit;
 import java.awt.event.ActionEvent;
 import java.io.IOException;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
 import javax.swing.JEditorPane;
 import javax.swing.text.BadLocationException;
@@ -22,6 +25,7 @@ import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
+import javax.swing.text.DefaultStyledDocument.ElementSpec;
 import javax.swing.text.html.CSS;
 import javax.swing.text.html.HTML;
 import javax.swing.text.html.HTMLDocument;
@@ -100,6 +104,156 @@ public class WebEditEditorKit extends HTMLEditorKit
 			int start = pane.getSelectionStart();
 			doc.removeCharacterAttribute(start,pane.getSelectionEnd()-start,CSS.Attribute.FLOAT);
 		}
+  }
+  
+  public static abstract class ListMutateAction extends StyledTextAction
+  {
+		private Logger log = Logger.getLogger(this.getClass());
+
+		protected class Paragraph
+		{
+			public List stack = new LinkedList();
+			public MutableAttributeSet attrs;
+			public HTML.Tag tag;
+			public ElementSpec[] content;
+		}
+		
+		public ListMutateAction(String name)
+  	{
+  		super(name);
+  	}
+  	
+  	private boolean isListElement(Element el)
+  	{
+  		HTML.Tag tag = (HTML.Tag)el.getAttributes().getAttribute(StyleConstants.NameAttribute);
+  		if ((tag==HTML.Tag.UL)||(tag==HTML.Tag.OL))
+  		{
+  			return true;
+  		}
+  		return false;
+  	}
+  	
+  	private List buildListStack(Element el)
+  	{
+  		if (el==null)
+  		{
+  			return new LinkedList();
+  		}
+  		List result = buildListStack(el.getParentElement());
+  		if (isListElement(el))
+  		{
+  			result.add(el.getAttributes());
+  		}
+  		return result;
+  	}
+  	
+  	private Paragraph buildParagraph(Element el)
+  	{
+  		Paragraph p = new Paragraph();
+  		p.attrs = new SimpleAttributeSet(el.getAttributes());
+  		p.tag=(HTML.Tag)p.attrs.getAttribute(StyleConstants.NameAttribute);
+  		int n = el.getElementCount();
+  		p.content = new ElementSpec[n];
+  		for (int i=0; i<n; i++)
+  		{
+  			Element leaf = el.getElement(i);
+  			int len = leaf.getEndOffset()-leaf.getStartOffset();
+  			p.content[i] = new ElementSpec(leaf.getAttributes(),ElementSpec.ContentType,len);
+  		}
+  		Element par = el;
+  		while (par!=null)
+  		{
+  			if (isListElement(par))
+  			{
+  				p.stack.add(0,par);
+  			}
+  			par=par.getParentElement();
+  		}
+  		return p;
+  	}
+  	
+  	protected abstract void mutateList(List paragraphs);
+  	
+		public void actionPerformed(ActionEvent e)
+		{
+			JEditorPane editorPane = getEditor(e);
+			WebEditDocument document = (WebEditDocument)editorPane.getDocument();
+			WebEditEditorKit editorKit = (WebEditEditorKit)editorPane.getEditorKit();
+			Caret caret = editorPane.getCaret();
+			int start = caret.getDot();
+			int end = caret.getMark();
+			if (end<start)
+			{
+				int temp = end;
+				end=start;
+				start=temp;
+			}
+			try
+			{
+				Element el = document.getParagraphElement(start);
+				int rlstart = el.getStartOffset();
+				while (el!=null)
+				{
+					if (isListElement(el))
+					{
+						rlstart=Math.min(rlstart,el.getStartOffset());
+					}
+					el=el.getParentElement();
+				}
+				el = document.getParagraphElement(end);
+				int rlend = el.getEndOffset();
+				while (el!=null)
+				{
+					if (isListElement(el))
+					{
+						rlend=Math.max(rlend,el.getStartOffset());
+					}
+					el=el.getParentElement();
+				}
+
+				List leadin = new ArrayList();
+				List paragraphs = new ArrayList();
+				List leadout = new ArrayList();
+				
+				List current = leadin;
+				Iterator it = document.getParagraphElementIterator(rlstart,rlend);
+				while (it.hasNext())
+				{
+					el = (Element)it.next();
+					if (el.getStartOffset()>end)
+					{
+						current=leadout;
+					}
+					else if (el.getEndOffset()>start)
+					{
+						current=paragraphs;
+					}
+					
+					current.add(buildParagraph(el));
+				}
+				mutateList(paragraphs);
+				leadin.addAll(paragraphs);
+				leadin.addAll(leadout);
+				List specs = new LinkedList();
+			}
+			catch (Exception ex)
+			{
+				log.error(ex);
+				ex.printStackTrace();
+			}
+		}
+  }
+  
+  public static class IncreaseListAction extends ListMutateAction
+  {
+  	public IncreaseListAction()
+  	{
+  		super("increase-list-level");
+  	}
+  	
+  	protected void mutateList(List paragraphs)
+  	{
+  	}
   }
   
 	public static class ToggleListAction extends StyledTextAction
@@ -233,18 +387,24 @@ public class WebEditEditorKit extends HTMLEditorKit
 		super();
 	}
 	
-	public Document createDefaultDocument()
+
+	public WebEditDocument createDefaultDocument(String bodyid)
 	{
 		StyleSheet styles = getStyleSheet();
-		StyleSheet ss = new StyleSheet();
+		StyleSheet ss = new WebEditStyleSheet();
 
 		ss.addStyleSheet(styles);
 
-		HTMLDocument doc = new WebEditDocument(ss);
+		WebEditDocument doc = new WebEditDocument(ss,bodyid);
 		doc.setParser(getParser());
 		doc.setAsynchronousLoadPriority(4);
 		doc.setTokenThreshold(100);
 		return doc;
+	}
+
+	public Document createDefaultDocument()
+	{
+		return createDefaultDocument(null);
 	}
 	
   public void write(Writer out, Document doc, int pos, int len) throws IOException, BadLocationException

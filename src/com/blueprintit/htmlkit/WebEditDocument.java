@@ -172,7 +172,56 @@ public class WebEditDocument extends HTMLDocument
 			changeUpdate();
 			endEdits(de);
 		}
+		
+		public void replace(int offset, int length, ElementSpec[] data, DefaultDocumentEvent de)
+		{
+			beginEdits(offset,length);
+			replaceUpdate(root,data);
+			endEdits(de);
+		}
 
+		protected void replaceUpdate(Element elem, ElementSpec[] data)
+		{
+			elem=root;
+			int index0 = elem.getElementIndex(offset);
+			int index1 = elem.getElementIndex(endOffset);
+			push(elem, index0);
+
+			while (index0==index1)
+			{
+				elem = elem.getElement(index0);
+				index0 = elem.getElementIndex(offset);
+				index1 = elem.getElementIndex(endOffset);
+				push(elem, index0);
+			}
+
+			ElemChanges ec = (ElemChanges) path.peek();
+			Element child0 = elem.getElement(index0);
+			Element child1 = elem.getElement(index1);
+			
+			if ((offset==child0.getStartOffset())&&(endOffset==child1.getStartOffset()))
+			{
+				log.debug("Valid replace, removing "+(index1-index0)+" elements");
+				for (int i=index0; i<index1; i++)
+				{
+					ec.removed.add(elem.getElement(i));
+				}
+				
+				// fold in the specified subtree
+				int n = data.length;
+				for (int i=0; i<n; i++)
+				{
+					insertElement(data[i]);
+				}
+
+				// pop the remaining path
+				while (path.size()!=0)
+				{
+					pop();
+				}
+			}
+		}
+		
 		/**
 		 * Inserts an update into the document.
 		 * 
@@ -554,6 +603,7 @@ public class WebEditDocument extends HTMLDocument
 								push(ec.parent.getElement(0), 0, true);
 							break;
 						default:
+							//log.debug("Pushing new element");
 							Element belem = createBranchElement(ec.parent, es.getAttributes());
 							ec.added.addElement(belem);
 							push(belem, 0);
@@ -561,12 +611,14 @@ public class WebEditDocument extends HTMLDocument
 					}
 					break;
 				case ElementSpec.EndTagType:
+					//log.debug("Popping element");
 					pop();
 					break;
 				case ElementSpec.ContentType:
 					int len = es.getLength();
 					if (es.getDirection()!=ElementSpec.JoinNextDirection)
 					{
+						//log.debug("Adding new content");
 						Element leaf = createLeafElement(ec.parent, es.getAttributes(),
 								pos, pos+len);
 						ec.added.addElement(leaf);
@@ -633,27 +685,36 @@ public class WebEditDocument extends HTMLDocument
 				push(elem, index0);
 				ElemChanges ec = (ElemChanges) path.peek();
 
+				// Get rid of any completely deleted elements at the start of the range.
+				Element child0 = elem.getElement(index0);
+				while ((index0<index1)&&(child0.getStartOffset()==rmOffs0))
+				{
+					// First element is totally removed
+					ec.removed.addElement(child0);
+					rmOffs0=child0.getEndOffset();
+					index0++;
+					child0 = elem.getElement(index0);
+				}
+
 				// if the range is contained by one element,
 				// we just forward the request
 				if (index0==index1)
 				{
-					Element child0 = elem.getElement(index0);
-					if (rmOffs0<=child0.getStartOffset()&&rmOffs1>=child0.getEndOffset())
+					if (rmOffs0<rmOffs1)
 					{
-						// Element totally removed.
-						ec.removed.addElement(child0);
-					}
-					else if (removeElements(child0, rmOffs0, rmOffs1))
-					{
-						ec.removed.addElement(child0);
+						if (rmOffs0<=child0.getStartOffset()&&rmOffs1>=child0.getEndOffset())
+						{
+							// Element totally removed.
+							ec.removed.addElement(child0);
+						}
+						else if (removeElements(child0, rmOffs0, rmOffs1))
+						{
+							ec.removed.addElement(child0);
+						}
 					}
 				}
 				else
 				{
-					// the removal range spans elements. If we can join
-					// the two endpoints, do it. Otherwise we remove the
-					// interior and forward to the endpoints.
-					Element child0 = elem.getElement(index0);
 					Element child1 = elem.getElement(index1);
 					boolean containsOffs1 = (rmOffs1<elem.getEndOffset());
 					if (containsOffs1&&canJoin(child0, child1, rmOffs0, rmOffs1))
@@ -672,7 +733,7 @@ public class WebEditDocument extends HTMLDocument
 						// remove interior and forward
 						int rmIndex0 = index0+1;
 						int rmIndex1 = index1-1;
-						if (child0.getStartOffset()==rmOffs0||(index0==0&&child0.getStartOffset()>rmOffs0&&child0
+						if (child0.getStartOffset()>=rmOffs0||(index0==0&&child0.getStartOffset()>rmOffs0&&child0
 										.getEndOffset()<=rmOffs1))
 						{
 							// start element completely consumed
@@ -684,7 +745,7 @@ public class WebEditDocument extends HTMLDocument
 							child1 = null;
 							rmIndex1++;
 						}
-						else if (child1.getStartOffset()==rmOffs1)
+						else if (child1.getStartOffset()>=rmOffs1)
 						{
 							// end element not touched
 							child1 = null;
@@ -1385,11 +1446,57 @@ public class WebEditDocument extends HTMLDocument
 	
 	public WebEditDocument(StyleSheet ss)
 	{
+		this(ss,null);
+	}
+	
+	public WebEditDocument(StyleSheet ss, String bodyid)
+	{
 		super(ss);
-		webuffer = new WebEditElementBuffer(createDefaultRoot());
+		webuffer = new WebEditElementBuffer(createDefaultRoot(bodyid));
 		buffer=webuffer;
 	}
 
+	protected AbstractElement createDefaultRoot()
+	{
+		return createDefaultRoot(null);
+	}
+  /**
+	 * Creates the root element to be used to represent the default document
+	 * structure.
+	 * 
+	 * @return the element base
+	 */
+	protected AbstractElement createDefaultRoot(String bodyid)
+	{
+		// grabs a write-lock for this initialization and
+		// abandon it during initialization so in normal
+		// operation we can detect an illegitimate attempt
+		// to mutate attributes.
+		writeLock();
+		MutableAttributeSet a = new SimpleAttributeSet();
+		a.addAttribute(StyleConstants.NameAttribute, HTML.Tag.HTML);
+		BlockElement html = new BlockElement(null, a.copyAttributes());
+		a.removeAttributes(a);
+		a.addAttribute(StyleConstants.NameAttribute, HTML.Tag.BODY);
+		if (bodyid!=null)
+			a.addAttribute(HTML.Attribute.ID,bodyid);
+		BlockElement body = new BlockElement(html, a.copyAttributes());
+		a.removeAttributes(a);
+		a.addAttribute(StyleConstants.NameAttribute, HTML.Tag.P);
+		BlockElement paragraph = new BlockElement(body, a.copyAttributes());
+		a.removeAttributes(a);
+		a.addAttribute(StyleConstants.NameAttribute, HTML.Tag.CONTENT);
+		RunElement brk = new RunElement(paragraph, a, 0, 1);
+		Element[] buff = new Element[1];
+		buff[0] = brk;
+		paragraph.replace(0, 0, buff);
+		buff[0] = paragraph;
+		body.replace(0, 0, buff);
+		buff[0] = body;
+		html.replace(0, 0, buff);
+		writeUnlock();
+		return html;
+	}
   /**
 	 * Initialize the document to reflect the given element structure (i.e. the
 	 * structure reported by the <code>getDefaultRootElement</code> method. If
@@ -1533,7 +1640,7 @@ public class WebEditDocument extends HTMLDocument
 		super.removeUpdate(chng);
 	}
 	
-	void updateStructure(int offset, ElementSpec[] specs)
+	void replaceElements(int offset, ElementSpec[] specs)
 	{
 		try
 		{
@@ -1544,8 +1651,7 @@ public class WebEditDocument extends HTMLDocument
 				length+=specs[i].getLength();
 			}
 	    DefaultDocumentEvent chng = new DefaultDocumentEvent(offset, length, DocumentEvent.EventType.CHANGE);
-			buffer.remove(offset,length,chng);
-			buffer.insert(offset,length,specs,chng);
+			webuffer.replace(offset,length,specs,chng);
 			fireChangedUpdate(chng);
 		}
 		finally
