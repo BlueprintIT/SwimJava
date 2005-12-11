@@ -95,7 +95,7 @@ public class UserInterface extends SwingEngine
 		}
 		if (container instanceof Window)
 		{
-			((Window)container).show();
+			((Window)container).setVisible(true);
 		}
 		else
 		{
@@ -109,7 +109,7 @@ public class UserInterface extends SwingEngine
 		{
 			Dialog dialog = (Dialog)container;
 			dialog.setModal(true);
-			dialog.show();
+			dialog.setVisible(true);
 		}
 		else
 		{

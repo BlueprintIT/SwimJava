@@ -32,7 +32,7 @@ public class QueryReportDialog extends JDialog
 		public ReportDisplay()
 		{
 			initDialog();
-			show();
+			setVisible(true);
 		}
 		
 		private void initDialog()
@@ -67,7 +67,7 @@ public class QueryReportDialog extends JDialog
 			button.addActionListener(new ActionListener() {
 				public void actionPerformed(ActionEvent e)
 				{
-					hide();
+					setVisible(false);
 				}
 			});
 			panel.add(button);
@@ -142,7 +142,7 @@ public class QueryReportDialog extends JDialog
 			public void actionPerformed(ActionEvent e)
 			{
 				result=true;
-				hide();
+				setVisible(false);
 			}
 		});
 		getContentPane().add(button);
@@ -155,7 +155,7 @@ public class QueryReportDialog extends JDialog
 			public void actionPerformed(ActionEvent e)
 			{
 				result=false;
-				hide();
+				setVisible(false);
 			}
 		});
 		getContentPane().add(button);
@@ -181,7 +181,7 @@ public class QueryReportDialog extends JDialog
 	public static boolean querySendReport(String title, String text, String report)
 	{
 		QueryReportDialog dialog = new QueryReportDialog(title,text,report);
-		dialog.show();
+		dialog.setVisible(true);
 		return dialog.getResult();
 	}
 }

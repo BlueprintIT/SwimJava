@@ -34,8 +34,6 @@ import org.apache.log4j.Logger;
 
 public class WebEditParagraphView extends ParagraphView
 {
-	private Logger log = Logger.getLogger(this.getClass());
-
 	static class AdvancedFlowStrategy extends FlowStrategy
 	{
 		private Logger log = Logger.getLogger(this.getClass());
